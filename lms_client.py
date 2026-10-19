@@ -8,6 +8,12 @@ from dataclasses import dataclass, field
 from typing import List, Dict, Optional, Tuple
 import requests
 from bs4 import BeautifulSoup
+from feedback_solver import (
+    FeedbackParser,
+    FeedbackAnswerGenerator,
+    FeedbackFormSchema,
+    FeedbackQuestion
+)
 
 def sanitize_filename(name: str) -> str:
     r"""
@@ -62,6 +68,20 @@ class CourseItem:
     url: str
     year: Optional[int] = None
     sections: List[SectionItem] = field(default_factory=list)
+
+@dataclass
+class FeedbackItem:
+    id: str
+    name: str
+    course_id: str
+    course_name: str
+    url: str
+    course_year: Optional[int] = None
+
+    def get_course_code(self) -> str:
+        m = re.search(r'\b[A-Za-z]{3}\s*\d{3}', self.course_name)
+        return m.group(0).replace(' ', '') if m else f"#{self.course_id}"
+
 
 
 class LMSClient:
@@ -399,6 +419,56 @@ class LMSClient:
             return []
         return self.parse_course_page_from_html(resp.text, course_id)
 
+    get_course_contents = get_course_sections
+
+    def get_course_feedback_forms(self, course: CourseItem) -> List[FeedbackItem]:
+        """
+        Fetch course page and extract all feedback, survey, and questionnaire activities.
+        """
+        course_url = f"{self.base_url}/course/view.php?id={course.id}"
+        try:
+            resp = self.session.get(course_url, timeout=20)
+            if resp.status_code != 200:
+                return []
+            return self.extract_feedback_forms_from_html(resp.text, course)
+        except Exception:
+            return []
+
+    def extract_feedback_forms_from_html(self, html_content: str, course: CourseItem) -> List[FeedbackItem]:
+        """
+        Parse HTML of a course page to find feedback modules (/mod/feedback/, /mod/questionnaire/, /mod/survey/).
+        """
+        soup = BeautifulSoup(html_content, 'html.parser')
+        feedbacks: List[FeedbackItem] = []
+        seen_ids = set()
+
+        for a in soup.find_all('a', href=True):
+            href = a['href']
+            if any(mod in href for mod in ['/mod/feedback/', '/mod/questionnaire/', '/mod/survey/']):
+                m = re.search(r'id=(\d+)', href)
+                fid = m.group(1) if m else ""
+                if fid in seen_ids:
+                    continue
+                seen_ids.add(fid)
+
+                name_span = a.find(class_=re.compile(r'instancename|activityname'))
+                raw_text = name_span.get_text(separator=' ', strip=True) if name_span else a.get_text(strip=True)
+                clean_name = raw_text.strip()
+                if not clean_name:
+                    clean_name = f"Feedback Module #{fid}"
+
+                full_url = href if href.startswith('http') else f"{self.base_url}{href}"
+                feedbacks.append(FeedbackItem(
+                    id=fid,
+                    name=clean_name,
+                    course_id=course.id,
+                    course_name=course.name,
+                    url=full_url,
+                    course_year=course.year
+                ))
+
+        return feedbacks
+
     def parse_folder_files_from_html(self, html_content: str) -> List[FileItem]:
         """
         Parse files inside a folder activity page.
@@ -594,3 +664,82 @@ class LMSClient:
         except Exception as e:
             print(f"Error downloading file {file_url}: {e}")
             return None
+
+    def get_feedback_form_schema(self, feedback_url: str) -> Tuple[Optional[FeedbackFormSchema], str]:
+        """
+        Fetch feedback page (view.php or complete.php) and parse questionnaire schema.
+        Handles navigating to complete.php if necessary.
+        """
+        try:
+            resp = self.session.get(feedback_url, timeout=20)
+            if resp.status_code != 200:
+                return None, f"HTTP Error {resp.status_code}"
+
+            schema, status = FeedbackParser.parse_html(resp.text)
+            if status.startswith("NEED_NAVIGATE:"):
+                nav_url = status.split("NEED_NAVIGATE:", 1)[1]
+                if not nav_url.startswith("http"):
+                    nav_url = urllib.parse.urljoin(self.base_url, nav_url)
+                resp2 = self.session.get(nav_url, timeout=20)
+                if resp2.status_code != 200:
+                    return None, f"HTTP Error {resp2.status_code} accessing form"
+                schema, status = FeedbackParser.parse_html(resp2.text)
+
+            return schema, status
+        except Exception as e:
+            return None, f"Error loading feedback form: {e}"
+
+    def submit_feedback_form(self, action_url: str, payload: dict) -> Tuple[bool, str]:
+        """
+        Submits feedback answers to complete.php.
+        """
+        try:
+            if not action_url.startswith("http"):
+                action_url = urllib.parse.urljoin(self.base_url, action_url)
+
+            # Ensure sesskey is included
+            if 'sesskey' not in payload and self.sesskey:
+                payload['sesskey'] = self.sesskey
+
+            resp = self.session.post(action_url, data=payload, timeout=25)
+            if resp.status_code in (200, 302, 303):
+                text_lower = resp.text.lower()
+                # Check for errors on the returned page
+                if "error" in text_lower and "alert-danger" in text_lower:
+                    soup = BeautifulSoup(resp.text, 'html.parser')
+                    err = soup.find(class_=re.compile(r'alert-danger|error'))
+                    err_msg = err.get_text(' ', strip=True) if err else "Submission rejected by server"
+                    return False, err_msg
+                return True, "Feedback successfully submitted"
+            else:
+                return False, f"Server responded with HTTP {resp.status_code}"
+        except Exception as e:
+            return False, f"Network error during feedback submission: {e}"
+
+    def auto_fill_feedback(
+        self,
+        feedback_url: str,
+        course_name: str = "",
+        api_key: str = "",
+        prefer_gemini: bool = True
+    ) -> Tuple[bool, str, Dict[str, str], str]:
+        """
+        One-stop helper: Fetches form, generates positive responses, submits, and returns results.
+        Returns: (success: bool, status_message: str, answers: dict, method_used: str)
+        """
+        schema, status = self.get_feedback_form_schema(feedback_url)
+        if not schema:
+            if status == "ALREADY_COMPLETED":
+                return True, "Feedback form is already completed.", {}, "NONE"
+            return False, f"Failed to retrieve form: {status}", {}, "NONE"
+
+        answers, method_used = FeedbackAnswerGenerator.generate_answers(
+            schema,
+            course_name=course_name,
+            api_key=api_key,
+            prefer_gemini=prefer_gemini
+        )
+
+        payload = FeedbackAnswerGenerator.build_submission_payload(schema, answers)
+        success, msg = self.submit_feedback_form(schema.action, payload)
+        return success, msg, answers, method_used

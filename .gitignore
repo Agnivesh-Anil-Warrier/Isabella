@@ -7,6 +7,8 @@
 .env.*
 !.env.example
 config.json
+feedback_cache.json
+completed_feedback.json
 
 # Downloaded Course Materials & Media Archives
 downloads/
