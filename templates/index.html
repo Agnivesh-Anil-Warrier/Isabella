@@ -2,13 +2,17 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+    <meta name="theme-color" content="#0a0e17">
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <title>Isabella • IIIT Kottayam Student Suite</title>
     <!-- Google Fonts -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&family=Plus+Jakarta+Sans:wght@400;500;600;700&family=JetBrains+Mono:wght@400;600;700&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="/static/css/style.css">
+    <link rel="stylesheet" href="/static/css/style.css?v=2.1">
 </head>
 <body>
     <!-- Background ambient glow shapes -->
@@ -65,36 +69,50 @@
         <!-- Navigation Tabs (Touch Friendly & Responsive) -->
         <nav class="main-nav-tabs" id="main-nav-tabs">
             <button class="nav-tab-btn active" data-tab="tab-courses">
-                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                     <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"></path>
                     <path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"></path>
+                    <path d="M8 7h8"></path>
+                    <path d="M8 11h6"></path>
                 </svg>
-                <span>Courses & Downloads</span>
+                <span class="tab-label">
+                    <span class="tab-label-desktop">Courses & Downloads</span>
+                    <span class="tab-label-mobile">Courses</span>
+                </span>
             </button>
             <button class="nav-tab-btn" data-tab="tab-feedback">
-                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                     <path d="M9 11l3 3L22 4"></path>
                     <path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"></path>
                 </svg>
-                <span>Course Feedback</span>
+                <span class="tab-label">
+                    <span class="tab-label-desktop">Course Feedback</span>
+                    <span class="tab-label-mobile">Feedback</span>
+                </span>
                 <span class="tab-badge" id="badge-feedback-count">0</span>
             </button>
             <button class="nav-tab-btn" data-tab="tab-attendance">
-                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                     <path d="M16 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path>
                     <circle cx="8.5" cy="7" r="4"></circle>
                     <line x1="20" y1="8" x2="20" y2="14"></line>
                     <line x1="23" y1="11" x2="17" y2="11"></line>
                 </svg>
-                <span>Attendance Portal</span>
+                <span class="tab-label">
+                    <span class="tab-label-desktop">Attendance Portal</span>
+                    <span class="tab-label-mobile">Attendance</span>
+                </span>
                 <span class="tab-badge success" id="badge-attendance-pct">--%</span>
             </button>
             <button class="nav-tab-btn" data-tab="tab-settings">
-                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                     <circle cx="12" cy="12" r="3"></circle>
                     <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path>
                 </svg>
-                <span>Settings</span>
+                <span class="tab-label">
+                    <span class="tab-label-desktop">Settings</span>
+                    <span class="tab-label-mobile">Settings</span>
+                </span>
             </button>
         </nav>
 
@@ -320,10 +338,7 @@
                                     <th>CODE</th>
                                     <th>COURSE NAME</th>
                                     <th>ATTENDED</th>
-                                    <th>PROGRESS</th>
                                     <th>%</th>
-                                    <th>STATUS</th>
-                                    <th>SAFE BUFFER</th>
                                 </tr>
                             </thead>
                             <tbody id="att-courses-tbody"></tbody>
@@ -346,7 +361,7 @@
                                 <tr>
                                     <th>CODE</th>
                                     <th>COURSE</th>
-                                    <th>DATE, TIME & VENUE</th>
+                                    <th>DATE & TIME</th>
                                     <th>STATUS</th>
                                 </tr>
                             </thead>
@@ -519,6 +534,6 @@
         </div>
     </div>
 
-    <script src="/static/js/app.js"></script>
+    <script src="/static/js/app.js?v=2.1"></script>
 </body>
 </html>

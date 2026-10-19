@@ -1756,18 +1756,14 @@ class LMSMainWindow(QMainWindow):
 
         self.table_by_course = QTableWidget()
         self.table_by_course.setObjectName("modernTable")
-        self.table_by_course.setColumnCount(7)
+        self.table_by_course.setColumnCount(4)
         self.table_by_course.setHorizontalHeaderLabels([
-            "CODE", "COURSE NAME", "ATTENDED", "PROGRESS", "%", "STATUS", "BUFFER"
+            "CODE", "COURSE NAME", "ATTENDED", "%"
         ])
         self.table_by_course.horizontalHeader().setSectionResizeMode(0, QHeaderView.ResizeMode.ResizeToContents)
         self.table_by_course.horizontalHeader().setSectionResizeMode(1, QHeaderView.ResizeMode.Stretch)
         self.table_by_course.horizontalHeader().setSectionResizeMode(2, QHeaderView.ResizeMode.ResizeToContents)
-        self.table_by_course.horizontalHeader().setSectionResizeMode(3, QHeaderView.ResizeMode.Fixed)
-        self.table_by_course.setColumnWidth(3, 90)
-        self.table_by_course.horizontalHeader().setSectionResizeMode(4, QHeaderView.ResizeMode.ResizeToContents)
-        self.table_by_course.horizontalHeader().setSectionResizeMode(5, QHeaderView.ResizeMode.ResizeToContents)
-        self.table_by_course.horizontalHeader().setSectionResizeMode(6, QHeaderView.ResizeMode.ResizeToContents)
+        self.table_by_course.horizontalHeader().setSectionResizeMode(3, QHeaderView.ResizeMode.ResizeToContents)
         self.table_by_course.verticalHeader().setVisible(False)
         self.table_by_course.verticalHeader().setDefaultSectionSize(40)
         self.table_by_course.setSelectionBehavior(QAbstractItemView.SelectionBehavior.SelectRows)
@@ -1798,7 +1794,7 @@ class LMSMainWindow(QMainWindow):
         self.table_recent_sessions.setObjectName("modernTable")
         self.table_recent_sessions.setColumnCount(4)
         self.table_recent_sessions.setHorizontalHeaderLabels([
-            "CODE", "COURSE NAME", "DATE, TIME & VENUE", "STATUS"
+            "CODE", "COURSE NAME", "DATE & TIME", "STATUS"
         ])
         self.table_recent_sessions.horizontalHeader().setSectionResizeMode(0, QHeaderView.ResizeMode.ResizeToContents)
         self.table_recent_sessions.horizontalHeader().setSectionResizeMode(1, QHeaderView.ResizeMode.Interactive)
@@ -1846,8 +1842,8 @@ class LMSMainWindow(QMainWindow):
 
         # Update Stat Cards
         overall_pct = report.overall_pct
-        pct_color = "#33ff66" if overall_pct >= 85.0 else ("#ffb000" if overall_pct >= 75.0 else "#ff5f56")
-        status_text = "[EXCELLENT (>= 85%)]" if overall_pct >= 85.0 else ("[SAFE (>= 75%)]" if overall_pct >= 75.0 else "[SHORTAGE (< 75%)]")
+        pct_color = "#33ff66" if overall_pct >= 85.0 else ("#ffb000" if overall_pct >= 80.0 else "#ff5f56")
+        status_text = "[EXCELLENT (>= 85%)]" if overall_pct >= 85.0 else ("[SAFE (>= 80%)]" if overall_pct >= 80.0 else "[SHORTAGE (< 80%)]")
 
         self.card_att_pct.val_label.setText(f"{overall_pct:.1f}%")
         self.card_att_pct.val_label.setStyleSheet(f"background: transparent; font-size: 20px; font-weight: 800; color: {pct_color};")
@@ -1899,59 +1895,14 @@ class LMSMainWindow(QMainWindow):
             att_item.setForeground(QColor("#d7ffd9"))
             self.table_by_course.setItem(row, 2, att_item)
 
-            # 3. Mini Progress Bar
-            chunk_color = "#33ff66" if c.pct >= 85.0 else ("#ffb000" if c.pct >= 75.0 else "#ff5f56")
-            bar_container = QWidget()
-            bar_layout = QHBoxLayout(bar_container)
-            bar_layout.setContentsMargins(4, 6, 4, 6)
-            bar = QProgressBar()
-            bar.setRange(0, 100)
-            bar.setValue(int(c.pct))
-            bar.setTextVisible(False)
-            bar.setFixedHeight(8)
-            bar.setStyleSheet(f"""
-                QProgressBar {{
-                    background-color: #070906;
-                    border: 1px solid #2a3a26;
-                    border-radius: 2px;
-                    height: 8px;
-                }}
-                QProgressBar::chunk {{
-                    background-color: {chunk_color};
-                }}
-            """)
-            bar_layout.addWidget(bar)
-            self.table_by_course.setCellWidget(row, 3, bar_container)
-
-            # 4. Percentage (Bold, Color-Coded)
+            # 3. Percentage (Bold, Color-Coded with >= 80% threshold)
+            chunk_color = "#33ff66" if c.pct >= 85.0 else ("#ffb000" if c.pct >= 80.0 else "#ff5f56")
             pct_item = QTableWidgetItem(f"{c.pct:.1f}%")
             pct_item.setFlags(Qt.ItemFlag.ItemIsEnabled)
             pct_item.setFont(QFont("Consolas", 10, QFont.Weight.Bold))
             pct_item.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
             pct_item.setForeground(QColor(chunk_color))
-            self.table_by_course.setItem(row, 4, pct_item)
-
-            # 5. Status Label ([ EXCELLENT ] / [ SAFE ] / [ DEFICIT ])
-            status_item = QTableWidgetItem(f"[ {c.status_label} ]")
-            status_item.setFlags(Qt.ItemFlag.ItemIsEnabled)
-            status_item.setFont(QFont("Consolas", 10, QFont.Weight.Bold))
-            status_item.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
-            status_item.setForeground(QColor(chunk_color))
-            self.table_by_course.setItem(row, 5, status_item)
-
-            # 6. Bunk / Safe Margin Buffer
-            buf_str = c.buffer_str
-            buf_item = QTableWidgetItem(buf_str)
-            buf_item.setFlags(Qt.ItemFlag.ItemIsEnabled)
-            buf_item.setFont(QFont("Consolas", 9, QFont.Weight.Bold))
-            buf_item.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
-            if "+" in buf_str:
-                buf_item.setForeground(QColor("#33ff66"))
-            elif "Need" in buf_str:
-                buf_item.setForeground(QColor("#ff5f56"))
-            else:
-                buf_item.setForeground(QColor("#ffb000"))
-            self.table_by_course.setItem(row, 6, buf_item)
+            self.table_by_course.setItem(row, 3, pct_item)
 
         self.lbl_course_count.setText(f"[{len(filtered_courses)} COURSES]")
 

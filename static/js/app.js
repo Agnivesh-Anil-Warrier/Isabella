@@ -253,6 +253,38 @@ function switchTab(tabId) {
     }
 }
 
+// Safe HTTP JSON fetchers that guarantee informative error handling
+async function postJson(url, bodyObj = {}) {
+    const res = await fetch(url, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'Accept': 'application/json'
+        },
+        body: JSON.stringify(bodyObj)
+    });
+    const contentType = res.headers.get('content-type') || '';
+    if (contentType.includes('application/json')) {
+        return await res.json();
+    }
+    const raw = await res.text();
+    const clean = raw.replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim();
+    throw new Error(`Server error (${res.status}): ${clean.slice(0, 150) || res.statusText}`);
+}
+
+async function getJson(url) {
+    const res = await fetch(url, {
+        headers: { 'Accept': 'application/json' }
+    });
+    const contentType = res.headers.get('content-type') || '';
+    if (contentType.includes('application/json')) {
+        return await res.json();
+    }
+    const raw = await res.text();
+    const clean = raw.replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim();
+    throw new Error(`Server error (${res.status}): ${clean.slice(0, 150) || res.statusText}`);
+}
+
 // Load Initial Configuration from Backend
 async function loadInitialConfig() {
     try {
@@ -390,13 +422,19 @@ function renderCourseGrid() {
         const cleanName = escapeHtml(course.name);
 
         card.innerHTML = `
-            <div class="card-header">
-                <span class="badge-year">${yearLabel}</span>
-                <input type="checkbox" class="course-checkbox" ${isSelected ? 'checked' : ''} data-id="${course.id}">
+            <div class="course-card-top">
+                <div class="course-meta-tags">
+                    <span class="tag-year">${yearLabel}</span>
+                </div>
+                <div class="card-checkbox" role="checkbox" aria-checked="${isSelected ? 'true' : 'false'}" title="Select course for download">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round">
+                        <polyline points="20 6 9 17 4 12"></polyline>
+                    </svg>
+                </div>
             </div>
             <div class="course-title" title="${cleanName}">${cleanName}</div>
-            <div class="card-footer">
-                <span class="course-id">#${course.id}</span>
+            <div class="course-card-footer">
+                <span class="course-id-label">#${course.id}</span>
                 <button class="btn btn-ghost btn-sm btn-preview" data-id="${course.id}" title="Preview folder contents">
                     <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                         <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path>
@@ -423,15 +461,18 @@ function renderCourseGrid() {
 }
 
 function toggleCourseSelection(id) {
-    if (state.selectedIds.has(id)) state.selectedIds.delete(id);
-    else state.selectedIds.add(id);
+    if (state.selectedIds.has(id)) {
+        state.selectedIds.delete(id);
+    } else {
+        state.selectedIds.add(id);
+    }
 
     const card = document.querySelector(`.course-card[data-id="${id}"]`);
     if (card) {
         const isSel = state.selectedIds.has(id);
         card.classList.toggle('selected', isSel);
-        const chk = card.querySelector('.course-checkbox');
-        if (chk) chk.checked = isSel;
+        const chk = card.querySelector('.card-checkbox');
+        if (chk) chk.setAttribute('aria-checked', isSel ? 'true' : 'false');
     }
     updateSelectionUI();
 }
@@ -440,6 +481,15 @@ function updateSelectionUI() {
     const count = state.selectedIds.size;
     elements.downloadBtnText.textContent = `Download Selected (${count})`;
     elements.btnDownloadSelected.disabled = (count === 0);
+
+    // Synchronize all rendered course cards and checkboxes in the DOM
+    document.querySelectorAll('.course-card').forEach(card => {
+        const id = card.dataset.id;
+        const isSel = state.selectedIds.has(id);
+        card.classList.toggle('selected', isSel);
+        const chk = card.querySelector('.card-checkbox');
+        if (chk) chk.setAttribute('aria-checked', isSel ? 'true' : 'false');
+    });
 }
 
 // ----------------------------------------------------------------------------
@@ -655,8 +705,7 @@ async function scanFeedback() {
     elements.btnScanFeedback.textContent = 'Scanning LMS...';
 
     try {
-        const res = await fetch('/api/feedback/scan', { method: 'POST' });
-        const data = await res.json();
+        const data = await postJson('/api/feedback/scan', {});
         if (data.success) {
             state.feedbackItems = data.feedback || [];
             elements.badgeFeedbackCount.textContent = state.feedbackItems.length;
@@ -714,13 +763,13 @@ function renderAttendance() {
         elements.attOverallPct.className = 'stat-card-val text-success';
         elements.attOverallStatus.textContent = 'EXCELLENT (Above 85% Target)';
         elements.badgeAttendancePct.className = 'tab-badge success';
-    } else if (pct >= 75.0) {
+    } else if (pct >= 80.0) {
         elements.attOverallPct.className = 'stat-card-val text-warning';
-        elements.attOverallStatus.textContent = 'SAFE (Above 75% Safe Margin)';
+        elements.attOverallStatus.textContent = 'SAFE (Above 80% Requirement)';
         elements.badgeAttendancePct.className = 'tab-badge';
     } else {
         elements.attOverallPct.className = 'stat-card-val text-danger';
-        elements.attOverallStatus.textContent = 'SHORTAGE (Below 75% Threshold)';
+        elements.attOverallStatus.textContent = 'SHORTAGE (Below 80% Requirement)';
         elements.badgeAttendancePct.className = 'tab-badge danger';
     }
 
@@ -743,25 +792,45 @@ function renderAttendanceCourses() {
     elements.attCoursesTbody.innerHTML = '';
     courses.forEach(c => {
         const tr = document.createElement('tr');
-        const colorClass = c.pct >= 85.0 ? 'text-success' : (c.pct >= 75.0 ? 'text-warning' : 'text-danger');
-        const badgeClass = c.pct >= 85.0 ? 'excellent' : (c.pct >= 75.0 ? 'safe' : 'deficit');
-        const barColor = c.pct >= 85.0 ? '#10b981' : (c.pct >= 75.0 ? '#f59e0b' : '#f43f5e');
+        const colorClass = c.pct >= 85.0 ? 'text-success' : (c.pct >= 80.0 ? 'text-warning' : 'text-danger');
 
         tr.innerHTML = `
             <td><span class="table-code">[${escapeHtml(c.code)}]</span></td>
             <td><strong>${escapeHtml(c.name)}</strong></td>
             <td>${c.attended} / ${c.total}</td>
-            <td>
-                <div class="table-progress-bg">
-                    <div class="table-progress-fill" style="width: ${Math.min(100, c.pct)}%; background: ${barColor};"></div>
-                </div>
-            </td>
             <td><span class="table-pct ${colorClass}">${c.pct.toFixed(1)}%</span></td>
-            <td><span class="badge-status ${badgeClass}">[ ${c.status_label} ]</span></td>
-            <td><strong>${c.buffer_str}</strong></td>
         `;
         elements.attCoursesTbody.appendChild(tr);
     });
+}
+
+function formatSessionDateTime(dt) {
+    if (!dt) return '';
+    let parts = dt.split('·').map(p => p.trim()).filter(Boolean);
+    let dateStr = parts[0] || '';
+    if (dateStr.includes('T')) {
+        const isoDate = dateStr.split('T')[0];
+        const [y, m, d] = isoDate.split('-');
+        if (y && m && d) {
+            const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+            const mIdx = parseInt(m, 10);
+            if (mIdx >= 1 && mIdx <= 12) {
+                dateStr = `${parseInt(d, 10)} ${months[mIdx - 1]} ${y}`;
+            }
+        }
+    }
+    let timeStr = '';
+    for (let i = 1; i < parts.length; i++) {
+        const p = parts[i];
+        if (p.includes(':') || p.includes('–') || p.includes('-')) {
+            timeStr = p;
+            break;
+        }
+    }
+    if (dateStr && timeStr) {
+        return `${dateStr} · ${timeStr}`;
+    }
+    return dateStr || timeStr || dt;
 }
 
 function renderAttendanceSessions() {
@@ -780,7 +849,7 @@ function renderAttendanceSessions() {
         tr.innerHTML = `
             <td><span class="table-code">[${escapeHtml(s.code)}]</span></td>
             <td>${escapeHtml(s.course)}</td>
-            <td>${escapeHtml(s.datetime_venue)}</td>
+            <td>${escapeHtml(formatSessionDateTime(s.datetime_venue))}</td>
             <td><span class="badge-status ${badgeClass}">[ ${escapeHtml(s.status.toUpperCase())} ]</span></td>
         `;
         elements.attSessionsTbody.appendChild(tr);
@@ -792,8 +861,7 @@ async function syncLiveAttendance() {
     elements.btnSyncAttendance.textContent = 'Syncing...';
 
     try {
-        const res = await fetch('/api/attendance/sync', { method: 'POST' });
-        const data = await res.json();
+        const data = await postJson('/api/attendance/sync', {});
         if (data.success) {
             state.attendanceReport = data;
             renderAttendance();
@@ -867,7 +935,7 @@ async function handleSettingsSubmit(e) {
 async function handleLogout() {
     if (!confirm('Log out from LMS session?')) return;
     try {
-        await fetch('/api/auth/logout', { method: 'POST' });
+        await postJson('/api/auth/logout', {});
         state.courses = [];
         state.selectedIds.clear();
         renderCourseGrid();
@@ -1012,7 +1080,7 @@ function listenToDownloadProgress() {
 
 async function openDownloadsFolder() {
     try {
-        await fetch('/api/open-downloads', { method: 'POST' });
+        await postJson('/api/open-downloads', {});
     } catch (e) {}
 }
 

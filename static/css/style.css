@@ -988,6 +988,14 @@ body {
     box-shadow: 0 4px 14px var(--primary-glow);
 }
 
+.tab-label-desktop {
+    display: inline;
+}
+
+.tab-label-mobile {
+    display: none;
+}
+
 .tab-badge {
     padding: 2px 7px;
     font-size: 0.72rem;
@@ -1404,24 +1412,478 @@ body {
     justify-content: flex-end;
 }
 
-/* Responsiveness & Mobile Optimization */
+/* ============================================================================
+   Responsiveness & Mobile Screen Optimization
+   Catering to iPhone, Android, and small touchscreens (< 768px and < 480px)
+   ============================================================================ */
+
+/* Touch feedback for all mobile tap targets */
+* {
+    -webkit-tap-highlight-color: transparent;
+}
+
+.btn:active, .nav-tab-btn:active, .pill-tab:active, .card-checkbox:active {
+    transform: scale(0.96) !important;
+    transition: transform 0.08s ease !important;
+}
+
 @media (max-width: 768px) {
-    .app-layout { padding: 12px; }
-    .desktop-only { display: none !important; }
-    .app-header { flex-direction: column; align-items: flex-start; gap: 12px; }
-    .header-right { width: 100%; justify-content: space-between; }
-    .control-bar { flex-direction: column; align-items: stretch; }
-    .search-box { max-width: none; }
-    .action-group { flex-direction: column; }
-    .action-group .btn { width: 100%; }
-    .courses-grid { grid-template-columns: 1fr; }
-    .feedback-grid { grid-template-columns: 1fr; }
-    .stat-grid { grid-template-columns: 1fr 1fr; }
-    .attendance-banner { flex-direction: column; align-items: flex-start; gap: 14px; }
-    .attendance-banner .btn { width: 100%; }
-    .main-nav-tabs { padding: 4px; gap: 4px; }
-    .nav-tab-btn { padding: 8px 12px; font-size: 0.82rem; }
-    .nav-tab-btn span { display: inline-block; }
+    /* App Canvas & Safe Area Padding */
+    .app-layout {
+        padding: 12px 14px calc(78px + env(safe-area-inset-bottom, 12px)) 14px;
+        max-width: 100vw;
+        overflow-x: hidden;
+    }
+
+    .desktop-only {
+        display: none !important;
+    }
+
+    /* Mobile Sticky Compact Header (App Bar) */
+    .app-header {
+        position: sticky;
+        top: 0;
+        z-index: 850;
+        margin: -12px -14px 16px -14px;
+        padding: 10px 14px;
+        background: rgba(10, 14, 23, 0.92);
+        backdrop-filter: blur(16px);
+        -webkit-backdrop-filter: blur(16px);
+        border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+        display: flex;
+        flex-direction: row;
+        align-items: center;
+        justify-content: space-between;
+        gap: 8px;
+    }
+
+    .header-left {
+        gap: 10px;
+    }
+
+    .logo-mark {
+        width: 34px;
+        height: 34px;
+        border-radius: 8px;
+    }
+
+    .logo-mark svg {
+        width: 18px;
+        height: 18px;
+    }
+
+    .brand-title {
+        font-size: 1.12rem;
+    }
+
+    .badge-tag {
+        font-size: 0.65rem;
+        padding: 1px 6px;
+    }
+
+    .brand-sub {
+        display: none;
+    }
+
+    .header-right {
+        gap: 8px;
+    }
+
+    .lan-chip {
+        display: none;
+    }
+
+    .user-pill {
+        padding: 4px 10px;
+        font-size: 0.76rem;
+        gap: 6px;
+    }
+
+    .year-badge {
+        display: none;
+    }
+
+    /* Modern Mobile Bottom Navigation Dock */
+    .main-nav-tabs {
+        position: fixed;
+        bottom: 0;
+        left: 0;
+        right: 0;
+        margin-bottom: 0;
+        border-radius: 20px 20px 0 0;
+        background: rgba(13, 18, 30, 0.96);
+        backdrop-filter: blur(24px);
+        -webkit-backdrop-filter: blur(24px);
+        border: 1px solid rgba(255, 255, 255, 0.12);
+        border-bottom: none;
+        z-index: 1000;
+        padding: 6px 8px calc(6px + env(safe-area-inset-bottom, 6px));
+        display: grid;
+        grid-template-columns: repeat(4, 1fr);
+        gap: 4px;
+        box-shadow: 0 -8px 32px rgba(0, 0, 0, 0.75);
+    }
+
+    .tab-label-desktop {
+        display: none !important;
+    }
+
+    .tab-label-mobile {
+        display: block !important;
+    }
+
+    .nav-tab-btn {
+        flex-direction: column;
+        justify-content: center;
+        align-items: center;
+        gap: 3px;
+        padding: 6px 2px;
+        font-size: 0.68rem;
+        font-weight: 600;
+        position: relative;
+        border-radius: 10px;
+        white-space: nowrap;
+        background: transparent;
+        border: none;
+    }
+
+    .nav-tab-btn svg {
+        width: 20px;
+        height: 20px;
+    }
+
+    .nav-tab-btn.active {
+        background: rgba(99, 102, 241, 0.2);
+        color: #818cf8;
+        box-shadow: none;
+    }
+
+    .nav-tab-btn .tab-badge {
+        position: absolute;
+        top: 2px;
+        right: 10%;
+        font-size: 0.6rem;
+        padding: 1px 4px;
+        min-width: 15px;
+        text-align: center;
+        border-radius: 10px;
+    }
+
+    /* Swipeable Filter Pills on Touch Screens */
+    .filter-section {
+        margin-bottom: 14px;
+    }
+
+    .year-pills {
+        display: flex;
+        flex-wrap: nowrap;
+        overflow-x: auto;
+        -webkit-overflow-scrolling: touch;
+        gap: 6px;
+        padding-bottom: 4px;
+        scrollbar-width: none;
+    }
+
+    .year-pills::-webkit-scrollbar {
+        display: none;
+    }
+
+    .pill-tab {
+        flex-shrink: 0;
+        padding: 7px 13px;
+        font-size: 0.8rem;
+        white-space: nowrap;
+    }
+
+    /* Controls & Actions Stacking */
+    .control-bar {
+        flex-direction: column;
+        align-items: stretch;
+        gap: 12px;
+        padding: 14px;
+        margin-bottom: 18px;
+    }
+
+    .search-box {
+        max-width: 100%;
+        width: 100%;
+        padding: 9px 14px;
+    }
+
+    .action-group {
+        flex-direction: column;
+        gap: 10px;
+        width: 100%;
+    }
+
+    .selection-actions {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 8px;
+        width: 100%;
+    }
+
+    .selection-actions .btn {
+        width: 100%;
+        padding: 8px 12px;
+        font-size: 0.82rem;
+    }
+
+    .toggle-control {
+        justify-content: center;
+        padding: 4px 0;
+    }
+
+    #btn-download-selected {
+        width: 100%;
+        padding: 12px 16px;
+        font-size: 0.92rem;
+    }
+
+    /* Course Cards (Full-Width Touch Cards) */
+    .courses-grid {
+        grid-template-columns: 1fr;
+        gap: 14px;
+    }
+
+    .course-card {
+        padding: 16px;
+        border-radius: var(--radius-md);
+    }
+
+    .course-title {
+        font-size: 1rem;
+        line-height: 1.35;
+    }
+
+    .course-card-footer {
+        margin-top: 14px;
+    }
+
+    .course-card-footer .btn {
+        padding: 8px 14px;
+        font-size: 0.82rem;
+    }
+
+    /* Feedback Cards */
+    .feedback-grid {
+        grid-template-columns: 1fr;
+        gap: 14px;
+    }
+
+    .feedback-card {
+        padding: 16px;
+        border-radius: var(--radius-md);
+    }
+
+    .feedback-actions {
+        flex-direction: column;
+        gap: 8px;
+    }
+
+    .feedback-actions .btn {
+        width: 100%;
+        padding: 9px 12px;
+    }
+
+    .bulk-feedback-bar {
+        flex-direction: column;
+        gap: 10px;
+        padding: 14px;
+    }
+
+    .bulk-feedback-bar .btn {
+        width: 100%;
+    }
+
+    /* Attendance Portal on Mobile */
+    .attendance-banner {
+        flex-direction: column;
+        align-items: stretch;
+        gap: 12px;
+        padding: 16px;
+    }
+
+    .att-banner-right .btn {
+        width: 100%;
+        justify-content: center;
+        padding: 10px;
+    }
+
+    .stat-grid {
+        grid-template-columns: 1fr 1fr;
+        gap: 10px;
+        margin-bottom: 18px;
+    }
+
+    .stat-card {
+        padding: 14px;
+    }
+
+    .stat-card-val {
+        font-size: 1.45rem;
+    }
+
+    .stat-card-label {
+        font-size: 0.65rem;
+    }
+
+    .stat-card-sub {
+        font-size: 0.72rem;
+    }
+
+    .att-view-switch {
+        width: 100%;
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 4px;
+        padding: 3px;
+    }
+
+    .att-switch-btn {
+        padding: 8px 4px;
+        font-size: 0.75rem;
+        text-align: center;
+        white-space: normal;
+        border-radius: 6px;
+    }
+
+    /* Pinned Sticky First Column on Mobile Tables */
+    .table-container {
+        border-radius: var(--radius-md);
+        overflow-x: auto;
+        -webkit-overflow-scrolling: touch;
+        position: relative;
+    }
+
+    .modern-table th, .modern-table td {
+        padding: 10px 12px;
+        font-size: 0.8rem;
+        white-space: nowrap;
+    }
+
+    .modern-table th:first-child,
+    .modern-table td:first-child {
+        position: sticky;
+        left: 0;
+        background: #111726;
+        z-index: 2;
+        box-shadow: 2px 0 6px rgba(0, 0, 0, 0.5);
+    }
+
+    .modern-table th:first-child {
+        background: #151d2f;
+        z-index: 3;
+    }
+
+    .table-progress-bg {
+        width: 65px;
+        height: 6px;
+    }
+
+    /* Settings Mobile */
+    .settings-card {
+        padding: 16px;
+    }
+
+    .settings-actions .btn {
+        width: 100%;
+    }
+
+    .lan-url-box {
+        flex-direction: column;
+        align-items: flex-start;
+        padding: 10px 12px;
+        word-break: break-all;
+    }
+
+    .lan-url-box code {
+        font-size: 0.88rem;
+        word-break: break-all;
+    }
+
+    /* Mobile Bottom-Sheet Modals */
+    .modal-overlay {
+        padding: 0;
+        align-items: flex-end;
+    }
+
+    .modal-card {
+        max-width: 100% !important;
+        width: 100% !important;
+        border-radius: 20px 20px 0 0 !important;
+        max-height: 85vh;
+        display: flex;
+        flex-direction: column;
+        margin: 0;
+        border-bottom: none;
+        box-shadow: 0 -12px 48px rgba(0, 0, 0, 0.85);
+        animation: modalSheetUp 0.28s cubic-bezier(0.16, 1, 0.3, 1);
+    }
+
+    .modal-header {
+        padding: 16px 20px;
+    }
+
+    .modal-title {
+        font-size: 1.15rem;
+    }
+
+    .modal-body {
+        padding: 16px 20px;
+        overflow-y: auto;
+        -webkit-overflow-scrolling: touch;
+        flex: 1;
+    }
+
+    .modal-footer {
+        padding: 12px 20px;
+        flex-direction: column;
+        gap: 8px;
+    }
+
+    .modal-footer .btn {
+        width: 100%;
+    }
+
+    .summary-box {
+        grid-template-columns: repeat(3, 1fr);
+        gap: 8px;
+        padding: 12px 8px;
+    }
+
+    .stat-num {
+        font-size: 1.35rem;
+    }
+
+    .stat-label {
+        font-size: 0.65rem;
+    }
+}
+
+/* Extra-small Phone Screens (< 380px) */
+@media (max-width: 380px) {
+    .stat-grid {
+        grid-template-columns: 1fr;
+    }
+
+    .nav-tab-btn {
+        font-size: 0.62rem;
+        padding: 4px 1px;
+    }
+
+    .brand-title {
+        font-size: 1rem;
+    }
+
+    .user-pill {
+        display: none;
+    }
+}
+
+@keyframes modalSheetUp {
+    from { transform: translateY(100%); }
+    to { transform: translateY(0); }
 }
 
 @keyframes pulse {

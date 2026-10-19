@@ -125,17 +125,33 @@ class AttendanceClient:
             c_obj = s.get("course") if isinstance(s.get("course"), dict) else {}
             code = c_obj.get("code") or s.get("courseCode") or ""
             cname = c_obj.get("name") or s.get("courseName") or ""
-            date = s.get("date") or ""
+            raw_date = s.get("date") or ""
             start_time = s.get("startTime") or ""
             end_time = s.get("endTime") or ""
-            sec = s.get("section") or ""
-            venue_parts = [date]
+
+            # Format ISO date (e.g. 2026-10-19T00:00:00.000Z -> 19 Oct 2026)
+            clean_date = raw_date
+            if raw_date and "T" in raw_date:
+                try:
+                    iso_d = raw_date.split("T")[0]
+                    parts = iso_d.split("-")
+                    if len(parts) == 3:
+                        y, m, d = parts
+                        months = ["", "Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"]
+                        m_idx = int(m)
+                        if 1 <= m_idx <= 12:
+                            clean_date = f"{int(d)} {months[m_idx]} {y}"
+                except Exception:
+                    clean_date = raw_date.split("T")[0]
+
+            venue_parts = []
+            if clean_date:
+                venue_parts.append(clean_date)
             if start_time and end_time:
                 venue_parts.append(f"{start_time} – {end_time}")
             elif start_time:
                 venue_parts.append(start_time)
-            if sec:
-                venue_parts.append(sec)
+            # Remove venue/section details (e.g. CSE-B1) - keep only date & time range
             datetime_venue = " · ".join(venue_parts)
 
             status = str(s.get("status") or "Unknown").capitalize()

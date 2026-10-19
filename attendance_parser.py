@@ -21,7 +21,7 @@ class CourseAttendance:
     def status_label(self) -> str:
         if self.pct >= 85.0:
             return "EXCELLENT"
-        elif self.pct >= 75.0:
+        elif self.pct >= 80.0:
             return "SAFE"
         else:
             return "DEFICIT"
@@ -30,15 +30,15 @@ class CourseAttendance:
     def buffer_str(self) -> str:
         if self.total == 0:
             return "--"
-        if self.pct >= 75.0:
-            can_miss = int(self.attended / 0.75) - self.total
+        if self.pct >= 80.0:
+            can_miss = int(self.attended / 0.80) - self.total
             can_miss = max(0, can_miss)
             if can_miss > 0:
                 return f"+{can_miss} can miss"
             else:
                 return "On border (0)"
         else:
-            needed = int(((0.75 * self.total) - self.attended) / 0.25 + 0.999)
+            needed = int(((0.80 * self.total) - self.attended) / 0.20 + 0.999)
             return f"Need +{needed} att."
 
 

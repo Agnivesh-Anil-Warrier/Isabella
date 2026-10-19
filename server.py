@@ -17,6 +17,7 @@ import threading
 import subprocess
 from typing import Dict, List, Optional
 from flask import Flask, render_template, request, jsonify, Response, send_from_directory, send_file
+from werkzeug.exceptions import HTTPException
 from dotenv import load_dotenv
 
 from lms_client import LMSClient, sanitize_filename, CourseItem, SectionItem, FileItem, FeedbackItem
@@ -25,6 +26,24 @@ from attendance_parser import AttendanceParser, AttendanceReport
 from feedback_solver import FeedbackParser, FeedbackAnswerGenerator
 
 app = Flask(__name__, static_folder="static", template_folder="templates")
+
+@app.errorhandler(HTTPException)
+def handle_http_exception(e):
+    if request.path.startswith("/api/"):
+        return jsonify({
+            "success": False,
+            "message": e.description or str(e)
+        }), e.code
+    return e
+
+@app.errorhandler(Exception)
+def handle_general_exception(e):
+    if request.path.startswith("/api/"):
+        return jsonify({
+            "success": False,
+            "message": f"Server error: {str(e)}"
+        }), 500
+    return e
 
 CONFIG_PATH = os.path.join(os.path.dirname(__file__), "config.json")
 FEEDBACK_CACHE_PATH = os.path.join(os.path.dirname(__file__), "feedback_cache.json")
@@ -235,7 +254,7 @@ def api_get_config():
 @app.route("/api/auth/login", methods=["POST"])
 def api_login():
     global global_client, cached_courses
-    data = request.json or {}
+    data = request.get_json(silent=True) or {}
     username = data.get("username", "").strip()
     password = data.get("password", "").strip()
     remember = bool(data.get("remember", True))
@@ -278,7 +297,7 @@ def api_logout():
 
 @app.route("/api/settings/update", methods=["POST"])
 def api_update_settings():
-    data = request.json or {}
+    data = request.get_json(silent=True) or {}
     username = data.get("username", "").strip()
     password = data.get("password", "").strip()
     default_year = str(data.get("default_year", "3"))
@@ -550,7 +569,7 @@ def api_start_download():
     if not client.logged_in:
         return jsonify({"success": False, "message": "Not authenticated"}), 401
 
-    data = request.json or {}
+    data = request.get_json(silent=True) or {}
     course_ids = data.get("course_ids", [])
     use_zip = bool(data.get("use_zip", False))
 
@@ -684,7 +703,7 @@ def api_scan_feedback():
 
 @app.route("/api/feedback/autofill", methods=["POST"])
 def api_autofill_feedback():
-    data = request.json or {}
+    data = request.get_json(silent=True) or {}
     fb_id = str(data.get("id", ""))
     fb_url = data.get("url", "")
     course_name = data.get("course_name", "")
@@ -727,7 +746,7 @@ def api_autofill_feedback():
 
 @app.route("/api/feedback/toggle-complete", methods=["POST"])
 def api_toggle_feedback_complete():
-    data = request.json or {}
+    data = request.get_json(silent=True) or {}
     fb_id = str(data.get("id", ""))
     completed = bool(data.get("completed", True))
 
@@ -793,38 +812,41 @@ def api_get_attendance():
 
 @app.route("/api/attendance/sync", methods=["POST"])
 def api_sync_attendance():
-    data = request.json or {}
-    cfg = get_saved_config()
-    email = data.get("email") or cfg.get("attendance_email", "").strip()
-    password = data.get("password") or cfg.get("attendance_password", "").strip()
+    try:
+        data = request.get_json(silent=True) or {}
+        cfg = get_saved_config()
+        email = data.get("email") or cfg.get("attendance_email", "").strip()
+        password = data.get("password") or cfg.get("attendance_password", "").strip()
 
-    if not email or not password:
-        return jsonify({"success": False, "message": "Attendance portal email and password required."}), 400
+        if not email or not password:
+            return jsonify({"success": False, "message": "Attendance portal email and password not configured in Settings."}), 400
 
-    client = AttendanceClient()
-    ok, msg, tokens = client.login(email, password)
-    if not ok or not tokens:
-        return jsonify({"success": False, "message": f"Authentication rejected by FACTS-H: {msg}"}), 401
+        client = AttendanceClient()
+        ok, msg, tokens = client.login(email, password)
+        if not ok or not tokens:
+            return jsonify({"success": False, "message": f"Authentication rejected by FACTS-H: {msg}"}), 401
 
-    acc = tokens.get("access", "")
-    ref = tokens.get("refresh", "")
-    save_config(
-        cfg.get("username", ""),
-        cfg.get("password", ""),
-        default_year=cfg.get("default_year", "3"),
-        remember=cfg.get("remember", True),
-        gemini_api_key=cfg.get("gemini_api_key", ""),
-        attendance_email=email,
-        attendance_password=password,
-        attendance_access_token=acc,
-        attendance_refresh_token=ref
-    )
+        acc = tokens.get("access", "")
+        ref = tokens.get("refresh", "")
+        save_config(
+            cfg.get("username", ""),
+            cfg.get("password", ""),
+            default_year=cfg.get("default_year", "3"),
+            remember=cfg.get("remember", True),
+            gemini_api_key=cfg.get("gemini_api_key", ""),
+            attendance_email=email,
+            attendance_password=password,
+            attendance_access_token=acc,
+            attendance_refresh_token=ref
+        )
 
-    ok2, msg2, report, raw = client.fetch_attendance(acc)
-    if ok2 and report:
-        return jsonify(serialize_attendance_report(report, source="LIVE SERVER (attendance.iiitkottayam.ac.in)"))
-    else:
-        return jsonify({"success": False, "message": f"Login succeeded but attendance fetch failed: {msg2}"}), 500
+        ok2, msg2, report, raw = client.fetch_attendance(acc)
+        if ok2 and report:
+            return jsonify(serialize_attendance_report(report, source="LIVE SERVER (attendance.iiitkottayam.ac.in)"))
+        else:
+            return jsonify({"success": False, "message": f"Login succeeded but attendance fetch failed: {msg2}"}), 500
+    except Exception as e:
+        return jsonify({"success": False, "message": f"Error syncing attendance: {str(e)}"}), 500
 
 
 # ============================================================================
