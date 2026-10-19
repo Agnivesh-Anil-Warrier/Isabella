@@ -16,7 +16,7 @@ from PySide6.QtWidgets import (
     QLabel, QLineEdit, QPushButton, QCheckBox, QComboBox, QProgressBar,
     QTextEdit, QTableWidget, QTableWidgetItem, QHeaderView, QStackedWidget,
     QFrame, QAbstractItemView, QMessageBox, QFileDialog, QScrollArea,
-    QDialog, QDialogButtonBox
+    QDialog, QDialogButtonBox, QSplitter
 )
 
 import concurrent.futures
@@ -27,10 +27,18 @@ from feedback_solver import (
     FeedbackFormSchema,
     FeedbackQuestion
 )
+from attendance_parser import (
+    AttendanceParser,
+    AttendanceReport,
+    CourseAttendance,
+    SessionRecord
+)
+from attendance_client import AttendanceClient
 
 CONFIG_PATH = os.path.join(os.path.dirname(__file__), "config.json")
 FEEDBACK_CACHE_PATH = os.path.join(os.path.dirname(__file__), "feedback_cache.json")
 COMPLETED_FEEDBACK_PATH = os.path.join(os.path.dirname(__file__), "completed_feedback.json")
+DEFAULT_ATTENDANCE_PATH = os.path.join(os.path.dirname(__file__), "attendance_portal_afterlogin.html")
 DOWNLOAD_DIR = os.path.join(os.path.dirname(__file__), "downloads")
 os.makedirs(DOWNLOAD_DIR, exist_ok=True)
 
@@ -101,6 +109,14 @@ def get_saved_config() -> dict:
                 cfg = json.load(f)
                 if "gemini_api_key" not in cfg:
                     cfg["gemini_api_key"] = ""
+                if "attendance_email" not in cfg:
+                    cfg["attendance_email"] = ""
+                if "attendance_password" not in cfg:
+                    cfg["attendance_password"] = ""
+                if "attendance_access_token" not in cfg:
+                    cfg["attendance_access_token"] = ""
+                if "attendance_refresh_token" not in cfg:
+                    cfg["attendance_refresh_token"] = ""
                 return cfg
         except Exception:
             pass
@@ -109,11 +125,25 @@ def get_saved_config() -> dict:
         "password": "",
         "default_year": "3",
         "remember": True,
-        "gemini_api_key": ""
+        "gemini_api_key": "",
+        "attendance_email": "",
+        "attendance_password": "",
+        "attendance_access_token": "",
+        "attendance_refresh_token": ""
     }
 
 
-def save_config(username: str, password: str, default_year: str = "3", remember: bool = True, gemini_api_key: Optional[str] = None):
+def save_config(
+    username: str,
+    password: str,
+    default_year: str = "3",
+    remember: bool = True,
+    gemini_api_key: Optional[str] = None,
+    attendance_email: Optional[str] = None,
+    attendance_password: Optional[str] = None,
+    attendance_access_token: Optional[str] = None,
+    attendance_refresh_token: Optional[str] = None
+):
     cfg = get_saved_config()
     cfg["username"] = username if remember else ""
     cfg["password"] = password if remember else ""
@@ -121,6 +151,14 @@ def save_config(username: str, password: str, default_year: str = "3", remember:
     cfg["remember"] = bool(remember)
     if gemini_api_key is not None:
         cfg["gemini_api_key"] = gemini_api_key
+    if attendance_email is not None:
+        cfg["attendance_email"] = attendance_email
+    if attendance_password is not None:
+        cfg["attendance_password"] = attendance_password
+    if attendance_access_token is not None:
+        cfg["attendance_access_token"] = attendance_access_token
+    if attendance_refresh_token is not None:
+        cfg["attendance_refresh_token"] = attendance_refresh_token
     with open(CONFIG_PATH, "w", encoding="utf-8") as f:
         json.dump(cfg, f, indent=2)
 
@@ -420,6 +458,125 @@ class DownloadWorker(QThread):
         self.finished.emit(stats)
 
 
+class FetchAttendanceLiveWorker(QThread):
+    finished = Signal(bool, str, object)  # success, message, AttendanceReport or None
+
+    def __init__(self, email: str, password: str, access_token: str = ""):
+        super().__init__()
+        self.email = email
+        self.password = password
+        self.access_token = access_token
+        self.client = AttendanceClient()
+
+    def run(self):
+        # 1. Try with existing cached token first
+        if self.access_token:
+            ok, msg, report, raw = self.client.fetch_attendance(self.access_token)
+            if ok and report:
+                self.finished.emit(True, "Synchronized live attendance via active session token", report)
+                return
+
+        # 2. Login with credentials
+        if not self.email or not self.password:
+            self.finished.emit(False, "Attendance Portal email or password not configured.", None)
+            return
+
+        ok, msg, tokens = self.client.login(self.email, self.password)
+        if not ok or not tokens:
+            self.finished.emit(False, f"Authentication rejected: {msg}", None)
+            return
+
+        acc = tokens.get("access") or ""
+        ref = tokens.get("refresh") or ""
+        ok, msg, report, raw = self.client.fetch_attendance(acc)
+        if ok and report:
+            cfg = get_saved_config()
+            save_config(
+                cfg.get("username", ""),
+                cfg.get("password", ""),
+                default_year=cfg.get("default_year", "3"),
+                remember=cfg.get("remember", True),
+                gemini_api_key=cfg.get("gemini_api_key", ""),
+                attendance_email=self.email,
+                attendance_password=self.password,
+                attendance_access_token=acc,
+                attendance_refresh_token=ref
+            )
+            self.finished.emit(True, "Live attendance synchronized from attendance.iiitkottayam.ac.in", report)
+        else:
+            self.finished.emit(False, f"Failed to retrieve attendance report: {msg}", None)
+
+
+class AttendanceLoginDialog(QDialog):
+    def __init__(self, parent=None, current_email="", current_password=""):
+        super().__init__(parent)
+        self.setWindowTitle("ATTENDANCE PORTAL LOGIN // FACTS-H")
+        self.setFixedSize(500, 310)
+        self.email = ""
+        self.password = ""
+
+        layout = QVBoxLayout(self)
+        layout.setContentsMargins(24, 22, 24, 22)
+        layout.setSpacing(14)
+
+        lbl_title = QLabel("> FACTS-H ATTENDANCE CREDENTIALS")
+        lbl_title.setStyleSheet("font-size: 14px; font-weight: 800; color: #33ff66; letter-spacing: 0.5px;")
+        lbl_sub = QLabel("// AUTHENTICATES AGAINST HTTPS://ATTENDANCE.IIITKOTTAYAM.AC.IN")
+        lbl_sub.setStyleSheet("font-size: 10px; color: #5f7a5c; font-weight: 600;")
+        layout.addWidget(lbl_title)
+        layout.addWidget(lbl_sub)
+
+        # Form
+        self.input_email = QLineEdit()
+        self.input_email.setObjectName("formInput")
+        self.input_email.setPlaceholderText("your.email@iiitkottayam.ac.in")
+        self.input_email.setText(current_email)
+
+        self.input_password = QLineEdit()
+        self.input_password.setObjectName("formInput")
+        self.input_password.setEchoMode(QLineEdit.EchoMode.Password)
+        self.input_password.setPlaceholderText("Attendance portal password")
+        self.input_password.setText(current_password)
+
+        lbl_e = QLabel("STUDENT EMAIL:")
+        lbl_e.setStyleSheet("font-size: 11px; font-weight: 700; color: #5f7a5c;")
+        layout.addWidget(lbl_e)
+        layout.addWidget(self.input_email)
+
+        lbl_p = QLabel("PORTAL PASSWORD:")
+        lbl_p.setStyleSheet("font-size: 11px; font-weight: 700; color: #5f7a5c;")
+        layout.addWidget(lbl_p)
+        layout.addWidget(self.input_password)
+
+        # Buttons
+        btn_layout = QHBoxLayout()
+        btn_layout.addStretch()
+
+        btn_cancel = QPushButton("[ CANCEL ]")
+        btn_cancel.setObjectName("secondaryBtn")
+        btn_cancel.setCursor(QCursor(Qt.CursorShape.PointingHandCursor))
+        btn_cancel.clicked.connect(self.reject)
+        btn_layout.addWidget(btn_cancel)
+
+        btn_save = QPushButton("[ ⚡ SAVE & SYNC LIVE ]")
+        btn_save.setObjectName("primaryBtn")
+        btn_save.setCursor(QCursor(Qt.CursorShape.PointingHandCursor))
+        btn_save.clicked.connect(self.on_save)
+        btn_layout.addWidget(btn_save)
+
+        layout.addLayout(btn_layout)
+
+    def on_save(self):
+        e = self.input_email.text().strip()
+        p = self.input_password.text().strip()
+        if not e or not p:
+            QMessageBox.warning(self, "INPUT_REQUIRED", "> PLEASE ENTER BOTH EMAIL AND PASSWORD.")
+            return
+        self.email = e
+        self.password = p
+        self.accept()
+
+
 # ============================================================================
 # Main Retro Terminal Desktop Application Window (PySide6)
 # ============================================================================
@@ -447,6 +604,13 @@ class LMSMainWindow(QMainWindow):
         self.autofill_worker: Optional[AutoFillFeedbackWorker] = None
         self.gemini_api_key: str = get_saved_config().get("gemini_api_key", "")
 
+        # Attendance Portal state
+        self.attendance_report: Optional[AttendanceReport] = None
+        self.attendance_file_path: str = DEFAULT_ATTENDANCE_PATH
+        self.attendance_view_mode: str = "split"  # "split", "course", "session"
+        self.attendance_status_filter: str = "all"  # "all", "present", "absent"
+        self.attendance_search_query: str = ""
+
         # Blinking cursor state
         self.cursor_state = True
         self.current_status_msg = "> SYSTEM READY • SELECT TARGET MODULES"
@@ -458,6 +622,7 @@ class LMSMainWindow(QMainWindow):
         self.init_ui()
         self.load_saved_credentials()
         self.update_ai_mode_badge()
+        self.load_attendance()
 
     def blink_cursor(self):
         self.cursor_state = not self.cursor_state
@@ -540,10 +705,16 @@ class LMSMainWindow(QMainWindow):
         self.btn_nav_feedback.clicked.connect(lambda: self.switch_page(1))
         s_layout.addWidget(self.btn_nav_feedback)
 
-        self.btn_nav_settings = QPushButton("> 03. ACCOUNT SETTINGS")
+        self.btn_nav_attendance = QPushButton("> 03. ATTENDANCE PORTAL")
+        self.btn_nav_attendance.setObjectName("navBtn")
+        self.btn_nav_attendance.setCursor(QCursor(Qt.CursorShape.PointingHandCursor))
+        self.btn_nav_attendance.clicked.connect(lambda: self.switch_page(2))
+        s_layout.addWidget(self.btn_nav_attendance)
+
+        self.btn_nav_settings = QPushButton("> 04. ACCOUNT SETTINGS")
         self.btn_nav_settings.setObjectName("navBtn")
         self.btn_nav_settings.setCursor(QCursor(Qt.CursorShape.PointingHandCursor))
-        self.btn_nav_settings.clicked.connect(lambda: self.switch_page(2))
+        self.btn_nav_settings.clicked.connect(lambda: self.switch_page(3))
         s_layout.addWidget(self.btn_nav_settings)
 
         # Sync button
@@ -570,7 +741,11 @@ class LMSMainWindow(QMainWindow):
         page_feedback = self.build_feedback_page()
         self.page_stack.addWidget(page_feedback)
 
-        # Page 2: Settings & Account
+        # Page 2: Attendance Portal (By Course & Recent Sessions)
+        page_attendance = self.build_attendance_page()
+        self.page_stack.addWidget(page_attendance)
+
+        # Page 3: Settings & Account
         page_settings = self.build_settings_page()
         self.page_stack.addWidget(page_settings)
 
@@ -578,7 +753,7 @@ class LMSMainWindow(QMainWindow):
 
     def switch_page(self, index: int):
         self.page_stack.setCurrentIndex(index)
-        nav_buttons = [self.btn_nav_downloader, self.btn_nav_feedback, self.btn_nav_settings]
+        nav_buttons = [self.btn_nav_downloader, self.btn_nav_feedback, self.btn_nav_attendance, self.btn_nav_settings]
         for i, btn in enumerate(nav_buttons):
             if i == index:
                 btn.setObjectName("navBtnActive")
@@ -930,12 +1105,13 @@ class LMSMainWindow(QMainWindow):
         self.feedback_table.setHorizontalHeaderLabels(["ID", "YEAR", "COURSE NAME", "FEEDBACK FORM TITLE", "ACTIONS"])
         self.feedback_table.setShowGrid(True)
         self.feedback_table.verticalHeader().setVisible(False)
-        self.feedback_table.verticalHeader().setDefaultSectionSize(44)
+        self.feedback_table.verticalHeader().setDefaultSectionSize(48)
         self.feedback_table.horizontalHeader().setSectionResizeMode(0, QHeaderView.ResizeMode.ResizeToContents)
         self.feedback_table.horizontalHeader().setSectionResizeMode(1, QHeaderView.ResizeMode.ResizeToContents)
         self.feedback_table.horizontalHeader().setSectionResizeMode(2, QHeaderView.ResizeMode.ResizeToContents)
         self.feedback_table.horizontalHeader().setSectionResizeMode(3, QHeaderView.ResizeMode.Stretch)
-        self.feedback_table.horizontalHeader().setSectionResizeMode(4, QHeaderView.ResizeMode.ResizeToContents)
+        self.feedback_table.horizontalHeader().setSectionResizeMode(4, QHeaderView.ResizeMode.Fixed)
+        self.feedback_table.setColumnWidth(4, 340)
         self.feedback_table.setSelectionBehavior(QAbstractItemView.SelectionBehavior.SelectRows)
         self.feedback_table.setSelectionMode(QAbstractItemView.SelectionMode.SingleSelection)
         layout.addWidget(self.feedback_table, 1)
@@ -1009,6 +1185,8 @@ class LMSMainWindow(QMainWindow):
         self.card_total_feedback.sub_label.setText(f"[{len(filtered)} OF {len(self.all_feedback_items)} VISIBLE]")
 
     def render_feedback_table(self, items: List[FeedbackItem]):
+        self.feedback_action_buttons.clear()
+        self.feedback_table.clearContents()
         self.feedback_table.setRowCount(len(items))
         for row, fb in enumerate(items):
             # 0. Module ID (Amber #ffb000)
@@ -1056,15 +1234,15 @@ class LMSMainWindow(QMainWindow):
             action_layout.addWidget(btn_autofill)
             self.feedback_action_buttons[fb.id] = btn_autofill
 
-            btn_open = QPushButton("[ 🌐 OPEN ]")
-            btn_open.setObjectName("actionBtn")
+            btn_open = QPushButton("[ ↗ OPEN ]")
+            btn_open.setObjectName("tableActionBtn")
             btn_open.setCursor(QCursor(Qt.CursorShape.PointingHandCursor))
             btn_open.setToolTip(f"Open in browser: {fb.url}")
             btn_open.clicked.connect(lambda checked=False, u=fb.url: self.open_feedback_url(u))
             action_layout.addWidget(btn_open)
 
-            btn_copy = QPushButton("[ 📋 COPY ]")
-            btn_copy.setObjectName("dockSmallBtn")
+            btn_copy = QPushButton("[ ⧉ COPY ]")
+            btn_copy.setObjectName("tableCopyBtn")
             btn_copy.setCursor(QCursor(Qt.CursorShape.PointingHandCursor))
             btn_copy.setToolTip("Copy URL to clipboard")
             btn_copy.clicked.connect(lambda checked=False, u=fb.url: self.copy_feedback_url(u))
@@ -1386,7 +1564,619 @@ class LMSMainWindow(QMainWindow):
         )
 
     # ========================================================================
-    # Page 2: Settings & Account Builder
+    # Page 2: Attendance Portal Builder (By Course & Recent Sessions)
+    # ========================================================================
+    def build_attendance_page(self) -> QWidget:
+        container = QWidget()
+        layout = QVBoxLayout(container)
+        layout.setContentsMargins(24, 20, 24, 18)
+        layout.setSpacing(14)
+
+        # 1. Top Bar: Title + Actions
+        top_bar = QHBoxLayout()
+        title_box = QVBoxLayout()
+        title_box.setSpacing(2)
+        lbl_head = QLabel("> ATTENDANCE RECON // FACTS-H PORTAL")
+        lbl_head.setStyleSheet("background: transparent; font-size: 18px; font-weight: 800; color: #d7ffd9; letter-spacing: 1px;")
+        lbl_sub = QLabel("// REAL-TIME COURSE ATTENDANCE RATIOS & RECENT SESSION AUDIT LOGS")
+        lbl_sub.setStyleSheet("background: transparent; font-size: 11px; color: #5f7a5c; font-weight: 600;")
+        title_box.addWidget(lbl_head)
+        title_box.addWidget(lbl_sub)
+        top_bar.addLayout(title_box)
+        top_bar.addStretch()
+
+        self.btn_att_sync_live = QPushButton("[ ⚡ SYNC LIVE ]")
+        self.btn_att_sync_live.setObjectName("primaryBtn")
+        self.btn_att_sync_live.setCursor(QCursor(Qt.CursorShape.PointingHandCursor))
+        self.btn_att_sync_live.setToolTip("Connect to attendance.iiitkottayam.ac.in and fetch live attendance")
+        self.btn_att_sync_live.clicked.connect(self.live_sync_attendance)
+        top_bar.addWidget(self.btn_att_sync_live)
+
+        self.btn_att_login_cfg = QPushButton("[ 🔑 LOGIN CONFIG ]")
+        self.btn_att_login_cfg.setObjectName("secondaryBtn")
+        self.btn_att_login_cfg.setCursor(QCursor(Qt.CursorShape.PointingHandCursor))
+        self.btn_att_login_cfg.setToolTip("Configure email and password for attendance.iiitkottayam.ac.in")
+        self.btn_att_login_cfg.clicked.connect(self.show_attendance_login_dialog)
+        top_bar.addWidget(self.btn_att_login_cfg)
+
+        self.btn_att_refresh = QPushButton("[ ⟳ LOCAL RELOAD ]")
+        self.btn_att_refresh.setObjectName("secondaryBtn")
+        self.btn_att_refresh.setCursor(QCursor(Qt.CursorShape.PointingHandCursor))
+        self.btn_att_refresh.setToolTip("Reload attendance records from local snapshot")
+        self.btn_att_refresh.clicked.connect(lambda: self.load_attendance())
+        top_bar.addWidget(self.btn_att_refresh)
+
+        self.btn_att_import = QPushButton("[ 📁 IMPORT HTML ]")
+        self.btn_att_import.setObjectName("secondaryBtn")
+        self.btn_att_import.setCursor(QCursor(Qt.CursorShape.PointingHandCursor))
+        self.btn_att_import.setToolTip("Load a saved attendance portal HTML export")
+        self.btn_att_import.clicked.connect(self.import_attendance_html)
+        top_bar.addWidget(self.btn_att_import)
+
+        self.btn_att_open_web = QPushButton("[ 🌐 OPEN WEB ]")
+        self.btn_att_open_web.setObjectName("secondaryBtn")
+        self.btn_att_open_web.setCursor(QCursor(Qt.CursorShape.PointingHandCursor))
+        self.btn_att_open_web.setToolTip("Open https://attendance.iiitkottayam.ac.in/student in default browser")
+        self.btn_att_open_web.clicked.connect(self.open_attendance_browser)
+        top_bar.addWidget(self.btn_att_open_web)
+
+        layout.addLayout(top_bar)
+
+        # 2. Student Recon Banner Card
+        self.att_banner = QFrame()
+        self.att_banner.setObjectName("attBanner")
+        banner_layout = QHBoxLayout(self.att_banner)
+        banner_layout.setContentsMargins(12, 8, 12, 8)
+        self.lbl_att_student_banner = QLabel("> STUDENT: -- • NAME: -- • PROGRAM: -- • CAMPUS: IIIT KOTTAYAM")
+        self.lbl_att_student_banner.setStyleSheet("background: transparent; font-size: 11px; font-weight: 700; color: #33ff66;")
+        self.lbl_att_source_file = QLabel("// SOURCE: attendance_portal_afterlogin.html")
+        self.lbl_att_source_file.setStyleSheet("background: transparent; font-size: 11px; color: #5f7a5c; font-weight: 600;")
+        banner_layout.addWidget(self.lbl_att_student_banner)
+        banner_layout.addStretch()
+        banner_layout.addWidget(self.lbl_att_source_file)
+        layout.addWidget(self.att_banner)
+
+        # 3. Stat Cards Grid (4 retro phosphor metric cards)
+        stats_layout = QHBoxLayout()
+        stats_layout.setSpacing(12)
+
+        self.card_att_pct = self.create_stat_card("> OVERALL ATTENDANCE", "--", "[STATUS: UNKNOWN]")
+        stats_layout.addWidget(self.card_att_pct)
+
+        self.card_att_sessions = self.create_stat_card("> TOTAL SESSIONS", "--", "[ATTENDED / COUNTED]")
+        self.card_att_sessions.val_label.setStyleSheet("background: transparent; font-size: 20px; font-weight: 800; color: #4dd8e6;")
+        stats_layout.addWidget(self.card_att_sessions)
+
+        self.card_att_missed = self.create_stat_card("> MISSED SESSIONS", "--", "[ABSENT LECTURES]")
+        self.card_att_missed.val_label.setStyleSheet("background: transparent; font-size: 20px; font-weight: 800; color: #ff5f56;")
+        stats_layout.addWidget(self.card_att_missed)
+
+        self.card_att_courses = self.create_stat_card("> TRACKED COURSES", "--", "[ACTIVE MODULES]")
+        self.card_att_courses.val_label.setStyleSheet("background: transparent; font-size: 20px; font-weight: 800; color: #ffb000;")
+        stats_layout.addWidget(self.card_att_courses)
+
+        layout.addLayout(stats_layout)
+
+        # 4. Filter & View Mode Toolbar
+        toolbar = QFrame()
+        toolbar.setObjectName("toolbarCard")
+        tb_layout = QHBoxLayout(toolbar)
+        tb_layout.setContentsMargins(12, 8, 12, 8)
+        tb_layout.setSpacing(10)
+
+        # View Mode Pills
+        lbl_view_title = QLabel("VIEW:")
+        lbl_view_title.setStyleSheet("background: transparent; color: #5f7a5c; font-weight: 700; font-size: 11px;")
+        tb_layout.addWidget(lbl_view_title)
+
+        self.att_pill_split = QPushButton("[■ SPLIT VIEW ]")
+        self.att_pill_split.setObjectName("pillBtnActive")
+        self.att_pill_split.setCursor(QCursor(Qt.CursorShape.PointingHandCursor))
+        self.att_pill_split.clicked.connect(lambda: self.set_attendance_view_mode("split"))
+        tb_layout.addWidget(self.att_pill_split)
+
+        self.att_pill_courses = QPushButton("[ BY COURSE ]")
+        self.att_pill_courses.setObjectName("pillBtn")
+        self.att_pill_courses.setCursor(QCursor(Qt.CursorShape.PointingHandCursor))
+        self.att_pill_courses.clicked.connect(lambda: self.set_attendance_view_mode("course"))
+        tb_layout.addWidget(self.att_pill_courses)
+
+        self.att_pill_sessions = QPushButton("[ RECENT SESSIONS ]")
+        self.att_pill_sessions.setObjectName("pillBtn")
+        self.att_pill_sessions.setCursor(QCursor(Qt.CursorShape.PointingHandCursor))
+        self.att_pill_sessions.clicked.connect(lambda: self.set_attendance_view_mode("session"))
+        tb_layout.addWidget(self.att_pill_sessions)
+
+        tb_layout.addSpacing(12)
+
+        # Status Filter Pills (for Recent Sessions)
+        lbl_status_title = QLabel("SESSIONS:")
+        lbl_status_title.setStyleSheet("background: transparent; color: #5f7a5c; font-weight: 700; font-size: 11px;")
+        tb_layout.addWidget(lbl_status_title)
+
+        self.att_pill_status_all = QPushButton("[■ ALL ]")
+        self.att_pill_status_all.setObjectName("pillBtnActive")
+        self.att_pill_status_all.setCursor(QCursor(Qt.CursorShape.PointingHandCursor))
+        self.att_pill_status_all.clicked.connect(lambda: self.set_attendance_status_filter("all"))
+        tb_layout.addWidget(self.att_pill_status_all)
+
+        self.att_pill_status_present = QPushButton("[ PRESENT ]")
+        self.att_pill_status_present.setObjectName("pillBtn")
+        self.att_pill_status_present.setCursor(QCursor(Qt.CursorShape.PointingHandCursor))
+        self.att_pill_status_present.clicked.connect(lambda: self.set_attendance_status_filter("present"))
+        tb_layout.addWidget(self.att_pill_status_present)
+
+        self.att_pill_status_absent = QPushButton("[ ABSENT ]")
+        self.att_pill_status_absent.setObjectName("pillBtn")
+        self.att_pill_status_absent.setCursor(QCursor(Qt.CursorShape.PointingHandCursor))
+        self.att_pill_status_absent.clicked.connect(lambda: self.set_attendance_status_filter("absent"))
+        tb_layout.addWidget(self.att_pill_status_absent)
+
+        tb_layout.addSpacing(12)
+
+        # Search Input
+        lbl_search = QLabel("SEARCH:")
+        lbl_search.setStyleSheet("background: transparent; color: #5f7a5c; font-weight: 700; font-size: 11px;")
+        tb_layout.addWidget(lbl_search)
+
+        self.att_search_input = QLineEdit()
+        self.att_search_input.setObjectName("searchInput")
+        self.att_search_input.setPlaceholderText("Filter by code, course name, room, or date...")
+        self.att_search_input.textChanged.connect(self.on_attendance_search_changed)
+        tb_layout.addWidget(self.att_search_input, 1)
+
+        btn_clear_search = QPushButton("[ ✕ ]")
+        btn_clear_search.setObjectName("dockSmallBtn")
+        btn_clear_search.setCursor(QCursor(Qt.CursorShape.PointingHandCursor))
+        btn_clear_search.clicked.connect(lambda: self.att_search_input.clear())
+        tb_layout.addWidget(btn_clear_search)
+
+        layout.addWidget(toolbar)
+
+        # 5. Dual Section Splitter: BY COURSE & RECENT SESSIONS
+        self.att_splitter = QSplitter(Qt.Orientation.Horizontal)
+        self.att_splitter.setObjectName("attSplitter")
+        self.att_splitter.setChildrenCollapsible(False)
+
+        # ── LEFT PANEL: "BY COURSE" SECTION ──
+        self.panel_by_course = QFrame()
+        pbc_layout = QVBoxLayout(self.panel_by_course)
+        pbc_layout.setContentsMargins(0, 0, 0, 0)
+        pbc_layout.setSpacing(8)
+
+        pbc_head = QHBoxLayout()
+        lbl_pbc = QLabel("// SECTION: BY COURSE (SUBJECT-WISE BREAKDOWN)")
+        lbl_pbc.setStyleSheet("font-size: 11px; font-weight: 800; color: #33ff66; letter-spacing: 0.5px;")
+        self.lbl_course_count = QLabel("[0 COURSES]")
+        self.lbl_course_count.setStyleSheet("font-size: 11px; font-weight: 700; color: #5f7a5c;")
+        pbc_head.addWidget(lbl_pbc)
+        pbc_head.addStretch()
+        pbc_head.addWidget(self.lbl_course_count)
+        pbc_layout.addLayout(pbc_head)
+
+        self.table_by_course = QTableWidget()
+        self.table_by_course.setObjectName("modernTable")
+        self.table_by_course.setColumnCount(7)
+        self.table_by_course.setHorizontalHeaderLabels([
+            "CODE", "COURSE NAME", "ATTENDED", "PROGRESS", "%", "STATUS", "BUFFER"
+        ])
+        self.table_by_course.horizontalHeader().setSectionResizeMode(0, QHeaderView.ResizeMode.ResizeToContents)
+        self.table_by_course.horizontalHeader().setSectionResizeMode(1, QHeaderView.ResizeMode.Stretch)
+        self.table_by_course.horizontalHeader().setSectionResizeMode(2, QHeaderView.ResizeMode.ResizeToContents)
+        self.table_by_course.horizontalHeader().setSectionResizeMode(3, QHeaderView.ResizeMode.Fixed)
+        self.table_by_course.setColumnWidth(3, 90)
+        self.table_by_course.horizontalHeader().setSectionResizeMode(4, QHeaderView.ResizeMode.ResizeToContents)
+        self.table_by_course.horizontalHeader().setSectionResizeMode(5, QHeaderView.ResizeMode.ResizeToContents)
+        self.table_by_course.horizontalHeader().setSectionResizeMode(6, QHeaderView.ResizeMode.ResizeToContents)
+        self.table_by_course.verticalHeader().setVisible(False)
+        self.table_by_course.verticalHeader().setDefaultSectionSize(40)
+        self.table_by_course.setSelectionBehavior(QAbstractItemView.SelectionBehavior.SelectRows)
+        self.table_by_course.setSelectionMode(QAbstractItemView.SelectionMode.SingleSelection)
+        self.table_by_course.setShowGrid(True)
+        self.table_by_course.cellClicked.connect(self.on_course_table_cell_clicked)
+        pbc_layout.addWidget(self.table_by_course)
+
+        self.att_splitter.addWidget(self.panel_by_course)
+
+        # ── RIGHT PANEL: "RECENT SESSIONS" SECTION ──
+        self.panel_recent_sessions = QFrame()
+        prs_layout = QVBoxLayout(self.panel_recent_sessions)
+        prs_layout.setContentsMargins(0, 0, 0, 0)
+        prs_layout.setSpacing(8)
+
+        prs_head = QHBoxLayout()
+        lbl_prs = QLabel("// SECTION: RECENT SESSIONS (AUDIT LOG)")
+        lbl_prs.setStyleSheet("font-size: 11px; font-weight: 800; color: #33ff66; letter-spacing: 0.5px;")
+        self.lbl_sessions_count = QLabel("[0 SESSIONS]")
+        self.lbl_sessions_count.setStyleSheet("font-size: 11px; font-weight: 700; color: #5f7a5c;")
+        prs_head.addWidget(lbl_prs)
+        prs_head.addStretch()
+        prs_head.addWidget(self.lbl_sessions_count)
+        prs_layout.addLayout(prs_head)
+
+        self.table_recent_sessions = QTableWidget()
+        self.table_recent_sessions.setObjectName("modernTable")
+        self.table_recent_sessions.setColumnCount(4)
+        self.table_recent_sessions.setHorizontalHeaderLabels([
+            "CODE", "COURSE NAME", "DATE, TIME & VENUE", "STATUS"
+        ])
+        self.table_recent_sessions.horizontalHeader().setSectionResizeMode(0, QHeaderView.ResizeMode.ResizeToContents)
+        self.table_recent_sessions.horizontalHeader().setSectionResizeMode(1, QHeaderView.ResizeMode.Interactive)
+        self.table_recent_sessions.setColumnWidth(1, 160)
+        self.table_recent_sessions.horizontalHeader().setSectionResizeMode(2, QHeaderView.ResizeMode.Stretch)
+        self.table_recent_sessions.horizontalHeader().setSectionResizeMode(3, QHeaderView.ResizeMode.ResizeToContents)
+        self.table_recent_sessions.verticalHeader().setVisible(False)
+        self.table_recent_sessions.verticalHeader().setDefaultSectionSize(36)
+        self.table_recent_sessions.setSelectionBehavior(QAbstractItemView.SelectionBehavior.SelectRows)
+        self.table_recent_sessions.setSelectionMode(QAbstractItemView.SelectionMode.SingleSelection)
+        self.table_recent_sessions.setShowGrid(True)
+        prs_layout.addWidget(self.table_recent_sessions)
+
+        self.att_splitter.addWidget(self.panel_recent_sessions)
+
+        # Set default 50/50 balance
+        self.att_splitter.setSizes([540, 540])
+        layout.addWidget(self.att_splitter, 1)
+
+        return container
+
+    def load_attendance(self, file_path: Optional[str] = None):
+        target_path = file_path or self.attendance_file_path
+        if not os.path.exists(target_path):
+            fallback = os.path.join(os.path.dirname(__file__), "attendance_portal_afterlogin.html")
+            if os.path.exists(fallback):
+                target_path = fallback
+
+        if not os.path.exists(target_path):
+            self.lbl_att_student_banner.setText("> ATTENDANCE FILE NOT FOUND. USE [ IMPORT HTML ] TO LOAD.")
+            self.lbl_att_student_banner.setStyleSheet("color: #ff5f56; font-size: 11px; font-weight: 700;")
+            return
+
+        self.attendance_file_path = target_path
+        report = AttendanceParser.load_from_file(target_path)
+        self.attendance_report = report
+
+        # Update Student Recon Banner
+        roll = report.student_roll or "2022BCS0000"
+        name = report.student_name or "STUDENT"
+        sem = report.student_semester or "CSE · SEMESTER 5"
+        self.lbl_att_student_banner.setText(f"> STUDENT: {roll} • NAME: {name} • {sem} • CAMPUS: IIIT KOTTAYAM")
+        self.lbl_att_student_banner.setStyleSheet("color: #33ff66; font-size: 11px; font-weight: 700;")
+        self.lbl_att_source_file.setText(f"// SOURCE: {os.path.basename(target_path)}")
+
+        # Update Stat Cards
+        overall_pct = report.overall_pct
+        pct_color = "#33ff66" if overall_pct >= 85.0 else ("#ffb000" if overall_pct >= 75.0 else "#ff5f56")
+        status_text = "[EXCELLENT (>= 85%)]" if overall_pct >= 85.0 else ("[SAFE (>= 75%)]" if overall_pct >= 75.0 else "[SHORTAGE (< 75%)]")
+
+        self.card_att_pct.val_label.setText(f"{overall_pct:.1f}%")
+        self.card_att_pct.val_label.setStyleSheet(f"background: transparent; font-size: 20px; font-weight: 800; color: {pct_color};")
+        self.card_att_pct.sub_label.setText(status_text)
+
+        self.card_att_sessions.val_label.setText(f"{report.total_attended} / {report.total_sessions}")
+        self.card_att_missed.val_label.setText(f"{report.total_absent}")
+        self.card_att_courses.val_label.setText(f"{len(report.courses)}")
+
+        self.render_attendance_tables()
+        self.append_log(
+            f"> [ATTENDANCE] Synchronized attendance portal: {len(report.courses)} courses, {len(report.recent_sessions)} recent sessions from {os.path.basename(target_path)}",
+            "#33ff66"
+        )
+
+    def render_attendance_tables(self):
+        if not self.attendance_report:
+            return
+
+        query = self.attendance_search_query.strip().lower()
+
+        # 1. Filter and Render "BY COURSE"
+        filtered_courses: List[CourseAttendance] = []
+        for c in self.attendance_report.courses:
+            if not query or (query in c.code.lower() or query in c.name.lower()):
+                filtered_courses.append(c)
+
+        self.table_by_course.clearContents()
+        self.table_by_course.setRowCount(len(filtered_courses))
+        for row, c in enumerate(filtered_courses):
+            # 0. Code (Amber #ffb000)
+            code_item = QTableWidgetItem(f"[{c.code}]")
+            code_item.setFlags(Qt.ItemFlag.ItemIsEnabled)
+            code_item.setForeground(QColor("#ffb000"))
+            code_item.setFont(QFont("Consolas", 10, QFont.Weight.Bold))
+            code_item.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
+            self.table_by_course.setItem(row, 0, code_item)
+
+            # 1. Course Name (Cyan #4dd8e6)
+            name_item = QTableWidgetItem(c.name)
+            name_item.setFlags(Qt.ItemFlag.ItemIsEnabled)
+            name_item.setForeground(QColor("#4dd8e6"))
+            self.table_by_course.setItem(row, 1, name_item)
+
+            # 2. Attended / Total (Pale Green #d7ffd9)
+            att_item = QTableWidgetItem(f"{c.attended} / {c.total}")
+            att_item.setFlags(Qt.ItemFlag.ItemIsEnabled)
+            att_item.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
+            att_item.setForeground(QColor("#d7ffd9"))
+            self.table_by_course.setItem(row, 2, att_item)
+
+            # 3. Mini Progress Bar
+            chunk_color = "#33ff66" if c.pct >= 85.0 else ("#ffb000" if c.pct >= 75.0 else "#ff5f56")
+            bar_container = QWidget()
+            bar_layout = QHBoxLayout(bar_container)
+            bar_layout.setContentsMargins(4, 6, 4, 6)
+            bar = QProgressBar()
+            bar.setRange(0, 100)
+            bar.setValue(int(c.pct))
+            bar.setTextVisible(False)
+            bar.setFixedHeight(8)
+            bar.setStyleSheet(f"""
+                QProgressBar {{
+                    background-color: #070906;
+                    border: 1px solid #2a3a26;
+                    border-radius: 2px;
+                    height: 8px;
+                }}
+                QProgressBar::chunk {{
+                    background-color: {chunk_color};
+                }}
+            """)
+            bar_layout.addWidget(bar)
+            self.table_by_course.setCellWidget(row, 3, bar_container)
+
+            # 4. Percentage (Bold, Color-Coded)
+            pct_item = QTableWidgetItem(f"{c.pct:.1f}%")
+            pct_item.setFlags(Qt.ItemFlag.ItemIsEnabled)
+            pct_item.setFont(QFont("Consolas", 10, QFont.Weight.Bold))
+            pct_item.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
+            pct_item.setForeground(QColor(chunk_color))
+            self.table_by_course.setItem(row, 4, pct_item)
+
+            # 5. Status Label ([ EXCELLENT ] / [ SAFE ] / [ DEFICIT ])
+            status_item = QTableWidgetItem(f"[ {c.status_label} ]")
+            status_item.setFlags(Qt.ItemFlag.ItemIsEnabled)
+            status_item.setFont(QFont("Consolas", 10, QFont.Weight.Bold))
+            status_item.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
+            status_item.setForeground(QColor(chunk_color))
+            self.table_by_course.setItem(row, 5, status_item)
+
+            # 6. Bunk / Safe Margin Buffer
+            buf_str = c.buffer_str
+            buf_item = QTableWidgetItem(buf_str)
+            buf_item.setFlags(Qt.ItemFlag.ItemIsEnabled)
+            buf_item.setFont(QFont("Consolas", 9, QFont.Weight.Bold))
+            buf_item.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
+            if "+" in buf_str:
+                buf_item.setForeground(QColor("#33ff66"))
+            elif "Need" in buf_str:
+                buf_item.setForeground(QColor("#ff5f56"))
+            else:
+                buf_item.setForeground(QColor("#ffb000"))
+            self.table_by_course.setItem(row, 6, buf_item)
+
+        self.lbl_course_count.setText(f"[{len(filtered_courses)} COURSES]")
+
+        # 2. Filter and Render "RECENT SESSIONS"
+        filtered_sessions: List[SessionRecord] = []
+        for s in self.attendance_report.recent_sessions:
+            # Query match
+            if query and not (query in s.code.lower() or query in s.course.lower() or query in s.datetime_venue.lower()):
+                continue
+            # Status filter
+            if self.attendance_status_filter == "present" and not s.is_present:
+                continue
+            elif self.attendance_status_filter == "absent" and s.is_present:
+                continue
+
+            filtered_sessions.append(s)
+
+        self.table_recent_sessions.clearContents()
+        self.table_recent_sessions.setRowCount(len(filtered_sessions))
+        for row, s in enumerate(filtered_sessions):
+            # 0. Code (Amber #ffb000)
+            code_item = QTableWidgetItem(f"[{s.code}]")
+            code_item.setFlags(Qt.ItemFlag.ItemIsEnabled)
+            code_item.setForeground(QColor("#ffb000"))
+            code_item.setFont(QFont("Consolas", 10, QFont.Weight.Bold))
+            code_item.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
+            self.table_recent_sessions.setItem(row, 0, code_item)
+
+            # 1. Course Name (Cyan #4dd8e6)
+            course_item = QTableWidgetItem(s.course)
+            course_item.setFlags(Qt.ItemFlag.ItemIsEnabled)
+            course_item.setForeground(QColor("#4dd8e6"))
+            self.table_recent_sessions.setItem(row, 1, course_item)
+
+            # 2. Date, Time & Venue (Pale Green #d7ffd9)
+            time_item = QTableWidgetItem(s.datetime_venue)
+            time_item.setFlags(Qt.ItemFlag.ItemIsEnabled)
+            time_item.setForeground(QColor("#d7ffd9"))
+            self.table_recent_sessions.setItem(row, 2, time_item)
+
+            # 3. Status Badge (Present vs Absent)
+            badge_container = QWidget()
+            badge_layout = QHBoxLayout(badge_container)
+            badge_layout.setContentsMargins(4, 4, 4, 4)
+            badge_layout.setAlignment(Qt.AlignmentFlag.AlignCenter)
+
+            lbl_badge = QLabel("[ ● PRESENT ]" if s.is_present else "[ ✕ ABSENT ]")
+            lbl_badge.setAlignment(Qt.AlignmentFlag.AlignCenter)
+            if s.is_present:
+                lbl_badge.setStyleSheet("""
+                    color: #33ff66;
+                    font-weight: 800;
+                    font-size: 11px;
+                    background-color: rgba(51, 255, 102, 0.10);
+                    border: 1px solid rgba(51, 255, 102, 0.35);
+                    border-radius: 2px;
+                    padding: 3px 8px;
+                """)
+            else:
+                lbl_badge.setStyleSheet("""
+                    color: #ff5f56;
+                    font-weight: 800;
+                    font-size: 11px;
+                    background-color: rgba(255, 95, 86, 0.15);
+                    border: 1px solid rgba(255, 95, 86, 0.45);
+                    border-radius: 2px;
+                    padding: 3px 8px;
+                """)
+            badge_layout.addWidget(lbl_badge)
+            self.table_recent_sessions.setCellWidget(row, 3, badge_container)
+
+        self.lbl_sessions_count.setText(f"[{len(filtered_sessions)} SESSIONS]")
+
+    def on_attendance_search_changed(self, text: str):
+        self.attendance_search_query = text
+        self.render_attendance_tables()
+
+    def on_course_table_cell_clicked(self, row: int, col: int):
+        code_item = self.table_by_course.item(row, 0)
+        if code_item:
+            code = code_item.text().strip("[] ")
+            curr_text = self.att_search_input.text().strip()
+            if curr_text == code:
+                self.att_search_input.clear()
+            else:
+                self.att_search_input.setText(code)
+
+    def set_attendance_view_mode(self, mode: str):
+        self.attendance_view_mode = mode
+
+        # Update view mode pill styling
+        self.att_pill_split.setText("[■ SPLIT VIEW ]" if mode == "split" else "[ SPLIT VIEW ]")
+        self.att_pill_split.setObjectName("pillBtnActive" if mode == "split" else "pillBtn")
+        self.att_pill_courses.setText("[■ BY COURSE ]" if mode == "course" else "[ BY COURSE ]")
+        self.att_pill_courses.setObjectName("pillBtnActive" if mode == "course" else "pillBtn")
+        self.att_pill_sessions.setText("[■ RECENT SESSIONS ]" if mode == "session" else "[ RECENT SESSIONS ]")
+        self.att_pill_sessions.setObjectName("pillBtnActive" if mode == "session" else "pillBtn")
+
+        self.att_pill_split.setStyle(self.att_pill_split.style())
+        self.att_pill_courses.setStyle(self.att_pill_courses.style())
+        self.att_pill_sessions.setStyle(self.att_pill_sessions.style())
+
+        # Toggle panel visibility
+        if mode == "split":
+            self.panel_by_course.show()
+            self.panel_recent_sessions.show()
+            self.att_splitter.setSizes([540, 540])
+        elif mode == "course":
+            self.panel_by_course.show()
+            self.panel_recent_sessions.hide()
+        elif mode == "session":
+            self.panel_by_course.hide()
+            self.panel_recent_sessions.show()
+
+    def set_attendance_status_filter(self, status: str):
+        self.attendance_status_filter = status
+
+        self.att_pill_status_all.setText("[■ ALL ]" if status == "all" else "[ ALL ]")
+        self.att_pill_status_all.setObjectName("pillBtnActive" if status == "all" else "pillBtn")
+        self.att_pill_status_present.setText("[■ PRESENT ]" if status == "present" else "[ PRESENT ]")
+        self.att_pill_status_present.setObjectName("pillBtnActive" if status == "present" else "pillBtn")
+        self.att_pill_status_absent.setText("[■ ABSENT ]" if status == "absent" else "[ ABSENT ]")
+        self.att_pill_status_absent.setObjectName("pillBtnActive" if status == "absent" else "pillBtn")
+
+        self.att_pill_status_all.setStyle(self.att_pill_status_all.style())
+        self.att_pill_status_present.setStyle(self.att_pill_status_present.style())
+        self.att_pill_status_absent.setStyle(self.att_pill_status_absent.style())
+
+        self.render_attendance_tables()
+
+    def import_attendance_html(self):
+        file_path, _ = QFileDialog.getOpenFileName(
+            self,
+            "Select Attendance Portal HTML Export",
+            os.path.dirname(__file__),
+            "HTML Files (*.html *.htm)"
+        )
+        if file_path:
+            self.load_attendance(file_path)
+            QMessageBox.information(
+                self, "ATTENDANCE_LOADED",
+                f"> ATTENDANCE REPORT IMPORTED SUCCESSFULLY:\n{os.path.basename(file_path)}"
+            )
+
+    def open_attendance_browser(self):
+        target = "https://attendance.iiitkottayam.ac.in/student"
+        QDesktopServices.openUrl(QUrl(target))
+        self.append_log(f"> [WEB] Launched {target} in default browser.", "#33ff66")
+
+    def show_attendance_login_dialog(self):
+        cfg = get_saved_config()
+        curr_e = cfg.get("attendance_email", "")
+        curr_p = cfg.get("attendance_password", "")
+        dlg = AttendanceLoginDialog(self, current_email=curr_e, current_password=curr_p)
+        if dlg.exec() == QDialog.DialogCode.Accepted:
+            save_config(
+                cfg.get("username", ""),
+                cfg.get("password", ""),
+                default_year=cfg.get("default_year", "3"),
+                remember=cfg.get("remember", True),
+                gemini_api_key=cfg.get("gemini_api_key", ""),
+                attendance_email=dlg.email,
+                attendance_password=dlg.password,
+                attendance_access_token="",
+                attendance_refresh_token=""
+            )
+            self.live_sync_attendance()
+
+    def live_sync_attendance(self):
+        cfg = get_saved_config()
+        email = cfg.get("attendance_email", "").strip()
+        password = cfg.get("attendance_password", "").strip()
+        token = cfg.get("attendance_access_token", "").strip()
+
+        if not email or not password:
+            self.show_attendance_login_dialog()
+            return
+
+        self.btn_att_sync_live.setEnabled(False)
+        self.update_status("> CONNECTING TO ATTENDANCE.IIITKOTTAYAM.AC.IN...")
+        self.append_log(f"> [ATTENDANCE] Authenticating with live server for {email}...", "#4dd8e6")
+
+        self.att_live_worker = FetchAttendanceLiveWorker(email, password, token)
+        self.att_live_worker.finished.connect(self.on_attendance_live_finished)
+        self.att_live_worker.start()
+
+    def on_attendance_live_finished(self, ok: bool, msg: str, report: Optional[AttendanceReport]):
+        self.btn_att_sync_live.setEnabled(True)
+        if ok and report:
+            self.attendance_report = report
+            roll = report.student_roll or "2024BCS0256"
+            name = report.student_name or "STUDENT"
+            sem = report.student_semester or "CSE · Semester 5"
+            self.lbl_att_student_banner.setText(f"> STUDENT: {roll} • NAME: {name} • {sem} • CAMPUS: IIIT KOTTAYAM")
+            self.lbl_att_student_banner.setStyleSheet("color: #33ff66; font-size: 11px; font-weight: 700;")
+            self.lbl_att_source_file.setText("// SOURCE: LIVE SERVER (attendance.iiitkottayam.ac.in)")
+
+            overall_pct = report.overall_pct
+            pct_color = "#33ff66" if overall_pct >= 85.0 else ("#ffb000" if overall_pct >= 75.0 else "#ff5f56")
+            status_text = "[EXCELLENT (>= 85%)]" if overall_pct >= 85.0 else ("[SAFE (>= 75%)]" if overall_pct >= 75.0 else "[SHORTAGE (< 75%)]")
+
+            self.card_att_pct.val_label.setText(f"{overall_pct:.1f}%")
+            self.card_att_pct.val_label.setStyleSheet(f"background: transparent; font-size: 20px; font-weight: 800; color: {pct_color};")
+            self.card_att_pct.sub_label.setText(status_text)
+
+            self.card_att_sessions.val_label.setText(f"{report.total_attended} / {report.total_sessions}")
+            self.card_att_missed.val_label.setText(f"{report.total_absent}")
+            self.card_att_courses.val_label.setText(f"{len(report.courses)}")
+
+            self.render_attendance_tables()
+            self.append_log(f"> [ATTENDANCE] {msg} ({len(report.courses)} courses, {len(report.recent_sessions)} recent sessions).", "#33ff66")
+            self.update_status("> LIVE ATTENDANCE SYNCHRONIZED [OK]")
+        else:
+            self.append_log(f"> [ATTENDANCE] Live sync error: {msg}", "#ff5f56")
+            self.update_status("> ATTENDANCE SYNC FAILED")
+            reply = QMessageBox.question(
+                self, "ATTENDANCE_LOGIN_REQUIRED",
+                f"> COULD NOT SYNC LIVE ATTENDANCE:\n{msg}\n\n> Would you like to enter/update your Attendance Portal email & password?",
+                QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No
+            )
+            if reply == QMessageBox.StandardButton.Yes:
+                self.show_attendance_login_dialog()
+
+    # ========================================================================
+    # Page 3: Settings & Account Builder
     # ========================================================================
     def build_settings_page(self) -> QWidget:
         container = QWidget()
@@ -1475,14 +2265,69 @@ class LMSMainWindow(QMainWindow):
 
         layout.addWidget(cred_card)
 
-        # Card 2: AI-Powered Feedback Assistant
+        # Card 2: Attendance Portal Authentication (FACTS-H Lab)
+        att_card = QFrame()
+        att_card.setObjectName("settingsCard")
+        attc_layout = QVBoxLayout(att_card)
+        attc_layout.setContentsMargins(18, 16, 18, 16)
+        attc_layout.setSpacing(12)
+
+        attc_title = QLabel("> 02. ATTENDANCE PORTAL AUTHENTICATION (FACTS-H)")
+        attc_title.setStyleSheet("font-size: 13px; font-weight: 800; color: #33ff66; letter-spacing: 0.5px;")
+        attc_layout.addWidget(attc_title)
+
+        attc_desc = QLabel("// LIVE INTEGRATION WITH HTTPS://ATTENDANCE.IIITKOTTAYAM.AC.IN/STUDENT:")
+        attc_desc.setStyleSheet("color: #5f7a5c; font-size: 11px;")
+        attc_layout.addWidget(attc_desc)
+
+        # Email
+        attc_layout.addWidget(QLabel("STUDENT_PORTAL_EMAIL:"))
+        self.input_setting_att_email = QLineEdit()
+        self.input_setting_att_email.setObjectName("formInput")
+        self.input_setting_att_email.setPlaceholderText("your.email@iiitkottayam.ac.in")
+        attc_layout.addWidget(self.input_setting_att_email)
+
+        # Password
+        attc_layout.addWidget(QLabel("PORTAL_PASSWORD:"))
+        att_pass_row = QHBoxLayout()
+        self.input_setting_att_password = QLineEdit()
+        self.input_setting_att_password.setObjectName("formInput")
+        self.input_setting_att_password.setEchoMode(QLineEdit.EchoMode.Password)
+        self.input_setting_att_password.setPlaceholderText("Enter attendance portal password")
+        att_pass_row.addWidget(self.input_setting_att_password, 1)
+
+        self.btn_toggle_att_pw = QPushButton("[👁]")
+        self.btn_toggle_att_pw.setObjectName("iconBtn")
+        self.btn_toggle_att_pw.clicked.connect(self.toggle_att_password_visibility)
+        att_pass_row.addWidget(self.btn_toggle_att_pw)
+        attc_layout.addLayout(att_pass_row)
+
+        att_btn_row = QHBoxLayout()
+        self.btn_save_att_settings = QPushButton("[ SAVE ATTENDANCE CONFIG ]")
+        self.btn_save_att_settings.setObjectName("primaryBtn")
+        self.btn_save_att_settings.setCursor(QCursor(Qt.CursorShape.PointingHandCursor))
+        self.btn_save_att_settings.clicked.connect(self.save_attendance_settings)
+        att_btn_row.addWidget(self.btn_save_att_settings)
+
+        self.btn_sync_att_now = QPushButton("[ ⚡ SYNC LIVE ATTENDANCE ]")
+        self.btn_sync_att_now.setObjectName("secondaryBtn")
+        self.btn_sync_att_now.setCursor(QCursor(Qt.CursorShape.PointingHandCursor))
+        self.btn_sync_att_now.clicked.connect(self.live_sync_attendance)
+        att_btn_row.addWidget(self.btn_sync_att_now)
+
+        att_btn_row.addStretch()
+        attc_layout.addLayout(att_btn_row)
+
+        layout.addWidget(att_card)
+
+        # Card 3: AI-Powered Feedback Assistant
         ai_card = QFrame()
         ai_card.setObjectName("settingsCard")
         aic_layout = QVBoxLayout(ai_card)
         aic_layout.setContentsMargins(18, 16, 18, 16)
         aic_layout.setSpacing(10)
 
-        aic_title = QLabel("> 02. AI-POWERED FEEDBACK ASSISTANT")
+        aic_title = QLabel("> 03. AI-POWERED FEEDBACK ASSISTANT")
         aic_title.setStyleSheet("font-size: 13px; font-weight: 800; color: #33ff66; letter-spacing: 0.5px;")
         aic_layout.addWidget(aic_title)
 
@@ -1603,6 +2448,38 @@ class LMSMainWindow(QMainWindow):
             self.input_password.setEchoMode(QLineEdit.EchoMode.Password)
             self.btn_toggle_pw.setText("[👁]")
 
+    def toggle_att_password_visibility(self):
+        if self.input_setting_att_password.echoMode() == QLineEdit.EchoMode.Password:
+            self.input_setting_att_password.setEchoMode(QLineEdit.EchoMode.Normal)
+            self.btn_toggle_att_pw.setText("[🙈]")
+        else:
+            self.input_setting_att_password.setEchoMode(QLineEdit.EchoMode.Password)
+            self.btn_toggle_att_pw.setText("[👁]")
+
+    def save_attendance_settings(self):
+        email = self.input_setting_att_email.text().strip()
+        password = self.input_setting_att_password.text().strip()
+        if not email or not password:
+            QMessageBox.warning(self, "INPUT_REQUIRED", "> PLEASE ENTER BOTH ATTENDANCE PORTAL EMAIL AND PASSWORD.")
+            return
+
+        cfg = get_saved_config()
+        save_config(
+            cfg.get("username", ""),
+            cfg.get("password", ""),
+            default_year=cfg.get("default_year", "3"),
+            remember=cfg.get("remember", True),
+            gemini_api_key=cfg.get("gemini_api_key", ""),
+            attendance_email=email,
+            attendance_password=password,
+            attendance_access_token="",
+            attendance_refresh_token=""
+        )
+        QMessageBox.information(
+            self, "ATTENDANCE_CONFIG_SAVED",
+            "> ATTENDANCE PORTAL CREDENTIALS SAVED.\nYOU CAN NOW CLICK [ SYNC LIVE ] TO FETCH YOUR ATTENDANCE."
+        )
+
     def load_saved_credentials(self):
         cfg = get_saved_config()
         username = cfg.get("username", "")
@@ -1610,6 +2487,8 @@ class LMSMainWindow(QMainWindow):
         default_year = cfg.get("default_year", "3")
         remember = cfg.get("remember", True)
         gemini_key = cfg.get("gemini_api_key", "")
+        att_email = cfg.get("attendance_email", "")
+        att_password = cfg.get("attendance_password", "")
 
         self.input_username.setText(username)
         self.input_password.setText(password)
@@ -1617,13 +2496,17 @@ class LMSMainWindow(QMainWindow):
         self.gemini_api_key = gemini_key
         if hasattr(self, 'input_gemini_key'):
             self.input_gemini_key.setText(gemini_key)
+        if hasattr(self, 'input_setting_att_email'):
+            self.input_setting_att_email.setText(att_email)
+        if hasattr(self, 'input_setting_att_password'):
+            self.input_setting_att_password.setText(att_password)
 
         idx = ["1", "2", "3", "4"].index(default_year) if default_year in ["1", "2", "3", "4"] else 2
         self.combo_default_year.setCurrentIndex(idx)
 
         # Set default active year pill
         self.set_year_filter(default_year)
-        self.set_feedback_year_filter("all")
+        self.set_feedback_year_filter(default_year)
 
         # Preload offline/cached reference feedback forms
         self.load_initial_feedback_data()
@@ -1648,7 +2531,7 @@ class LMSMainWindow(QMainWindow):
             self.lbl_user_status.setStyleSheet("color: #4dd8e6; font-size: 11px; font-weight: 700;")
             self.perform_login(auto_fetch=True)
         else:
-            self.switch_page(2)  # Focus settings page for login
+            self.switch_page(3)  # Focus settings page for login
 
     def save_settings(self):
         username = self.input_username.text().strip()
@@ -1679,7 +2562,7 @@ class LMSMainWindow(QMainWindow):
             self.lbl_user_roll.setText("UID: NOT_LOGGED_IN")
             self.lbl_user_status.setText("[○ OFFLINE]")
             self.lbl_user_status.setStyleSheet("color: #5f7a5c; font-size: 11px; font-weight: 700;")
-            self.switch_page(2)
+            self.switch_page(3)
             QMessageBox.information(self, "PURGED", "> STORED CREDENTIALS REMOVED FROM DISK.")
 
     def perform_login(self, auto_fetch=False):
@@ -1688,7 +2571,7 @@ class LMSMainWindow(QMainWindow):
 
         if not username or not password:
             QMessageBox.warning(self, "AUTH_REQUIRED", "> PLEASE PROVIDE LMS ROLL NUMBER AND PASSWORD.")
-            self.switch_page(2)
+            self.switch_page(3)
             return
 
         self.btn_login_now.setEnabled(False)
@@ -2011,15 +2894,33 @@ class LMSMainWindow(QMainWindow):
             color: #33ff66;
         }
 
+        #tableActionBtn, #tableCopyBtn {
+            background-color: transparent;
+            border: 1px solid #2a3a26;
+            border-radius: 2px;
+            padding: 4px 8px;
+            color: #9ccf9f;
+            font-family: 'JetBrains Mono', 'IBM Plex Mono', 'Consolas', monospace;
+            font-weight: 700;
+            font-size: 11px;
+            min-height: 24px;
+        }
+        #tableActionBtn:hover, #tableCopyBtn:hover {
+            background-color: rgba(51, 255, 102, 0.08);
+            border-color: #33ff66;
+            color: #33ff66;
+        }
+
         #autoFillBtn {
             background-color: rgba(51, 255, 102, 0.12);
             border: 1px solid #33ff66;
             border-radius: 2px;
-            padding: 6px 12px;
+            padding: 4px 8px;
             color: #33ff66;
+            font-family: 'JetBrains Mono', 'IBM Plex Mono', 'Consolas', monospace;
             font-weight: 700;
             font-size: 11px;
-            letter-spacing: 0.5px;
+            min-height: 24px;
         }
         #autoFillBtn:hover {
             background-color: #33ff66;
@@ -2031,14 +2932,16 @@ class LMSMainWindow(QMainWindow):
             color: #3d5239;
         }
 
-        #completedBtn {
-            background-color: rgba(51, 255, 102, 0.05);
-            border: 1px solid #1f2a1c;
+        #completedBtn, #completedBtn:disabled {
+            background-color: rgba(51, 255, 102, 0.08);
+            border: 1px solid rgba(51, 255, 102, 0.35);
             border-radius: 2px;
-            padding: 6px 12px;
-            color: #5f7a5c;
+            padding: 4px 8px;
+            color: #33ff66;
+            font-family: 'JetBrains Mono', 'IBM Plex Mono', 'Consolas', monospace;
             font-weight: 700;
             font-size: 11px;
+            min-height: 24px;
         }
 
         /* Metric Stat Cards */
@@ -2302,6 +3205,22 @@ class LMSMainWindow(QMainWindow):
             background-color: #33ff66;
             color: #0a0c09;
             border-color: #33ff66;
+        }
+
+        /* Splitter & Attendance Banner */
+        QSplitter::handle {
+            background-color: #1f2a1c;
+            width: 3px;
+            height: 3px;
+        }
+        QSplitter::handle:hover {
+            background-color: #33ff66;
+        }
+        #attBanner {
+            background-color: #0f130e;
+            border: 1px solid #2a3a26;
+            border-radius: 2px;
+            padding: 4px 10px;
         }
         """
         app_inst = QApplication.instance()
