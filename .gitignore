@@ -1,0 +1,51 @@
+# ============================================================================
+# Git Ignore Configuration for Isabella LMS Downloader
+# ============================================================================
+
+# Credentials & Local Configuration
+.env
+.env.*
+!.env.example
+config.json
+
+# Downloaded Course Materials & Media Archives
+downloads/
+*.zip
+*.tar.gz
+*.pdf
+*.pptx
+*.ppt
+*.docx
+*.doc
+
+# Python & Virtual Environments
+.venv/
+venv/
+ENV/
+env/
+__pycache__/
+*.py[cod]
+*$py.class
+*.egg-info/
+dist/
+build/
+
+# Scraped / Dummy HTML Snapshots in Root (Avoid tracking dumps)
+/*.html
+!templates/*.html
+!templates/**/*.html
+
+# Logs, Runtime & Temp Files
+*.log
+*.tmp
+*.bak
+.cache/
+
+# IDE & Operating System Artifacts
+.vscode/
+.idea/
+*.swp
+*.swo
+.DS_Store
+Thumbs.db
+Desktop.ini
