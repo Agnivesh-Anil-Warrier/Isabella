@@ -3,22 +3,18 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
-    <meta name="theme-color" content="#0a0e17">
+    <meta name="theme-color" content="#0a0c09">
     <meta name="mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <title>Isabella • IIIT Kottayam Student Suite</title>
-    <!-- Google Fonts -->
+    <!-- Google Fonts: JetBrains Mono & IBM Plex Mono -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&family=Plus+Jakarta+Sans:wght@400;500;600;700&family=JetBrains+Mono:wght@400;600;700&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="/static/css/style.css?v=2.1">
+    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@300;400;500;600;700;800&family=IBM+Plex+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="/static/css/style.css?v=3.1">
 </head>
 <body>
-    <!-- Background ambient glow shapes -->
-    <div class="ambient-glow glow-1"></div>
-    <div class="ambient-glow glow-2"></div>
-
     <div class="app-layout">
         <!-- Navigation Header -->
         <header class="app-header">
@@ -245,10 +241,8 @@
 
                 <!-- AI Engine Notice -->
                 <div class="ai-banner" id="ai-banner">
-                    <div class="ai-banner-icon">⚡</div>
                     <div class="ai-banner-text">
                         <strong>Feedback Engine:</strong> <span id="feedback-engine-name">Smart Positive Heuristic</span>
-                        <span class="ai-banner-sub">• Automatically selects top ratings (5/5) and fills authentic constructive responses.</span>
                     </div>
                 </div>
 
@@ -289,30 +283,6 @@
                             </svg>
                             <span>Sync Live</span>
                         </button>
-                    </div>
-                </div>
-
-                <!-- Metric Stat Cards -->
-                <div class="stat-grid">
-                    <div class="stat-card">
-                        <div class="stat-card-label">OVERALL ATTENDANCE</div>
-                        <div class="stat-card-val text-success" id="att-overall-pct">--%</div>
-                        <div class="stat-card-sub" id="att-overall-status">Loading attendance...</div>
-                    </div>
-                    <div class="stat-card">
-                        <div class="stat-card-label">ATTENDED SESSIONS</div>
-                        <div class="stat-card-val" id="att-attended-count">-- / --</div>
-                        <div class="stat-card-sub">Completed classroom sessions</div>
-                    </div>
-                    <div class="stat-card">
-                        <div class="stat-card-label">MISSED SESSIONS</div>
-                        <div class="stat-card-val text-danger" id="att-missed-count">--</div>
-                        <div class="stat-card-sub">Recorded absences</div>
-                    </div>
-                    <div class="stat-card">
-                        <div class="stat-card-label">ENROLLED COURSES</div>
-                        <div class="stat-card-val" id="att-courses-count">--</div>
-                        <div class="stat-card-sub">Active evaluated subjects</div>
                     </div>
                 </div>
 
@@ -534,6 +504,6 @@
         </div>
     </div>
 
-    <script src="/static/js/app.js?v=2.1"></script>
+    <script src="/static/js/app.js?v=3.1"></script>
 </body>
 </html>

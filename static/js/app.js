@@ -756,26 +756,34 @@ function renderAttendance() {
     elements.attStudentSem.textContent = `${report.student_semester || 'CSE · Semester 5'} • ${report.source}`;
 
     const pct = report.overall_pct || 0;
-    elements.attOverallPct.textContent = `${pct.toFixed(1)}%`;
-    elements.badgeAttendancePct.textContent = `${pct.toFixed(1)}%`;
-
-    if (pct >= 85.0) {
-        elements.attOverallPct.className = 'stat-card-val text-success';
-        elements.attOverallStatus.textContent = 'EXCELLENT (Above 85% Target)';
-        elements.badgeAttendancePct.className = 'tab-badge success';
-    } else if (pct >= 80.0) {
-        elements.attOverallPct.className = 'stat-card-val text-warning';
-        elements.attOverallStatus.textContent = 'SAFE (Above 80% Requirement)';
-        elements.badgeAttendancePct.className = 'tab-badge';
-    } else {
-        elements.attOverallPct.className = 'stat-card-val text-danger';
-        elements.attOverallStatus.textContent = 'SHORTAGE (Below 80% Requirement)';
-        elements.badgeAttendancePct.className = 'tab-badge danger';
+    if (elements.badgeAttendancePct) {
+        elements.badgeAttendancePct.textContent = `${pct.toFixed(1)}%`;
+        if (pct >= 85.0) {
+            elements.badgeAttendancePct.className = 'tab-badge success';
+        } else if (pct >= 80.0) {
+            elements.badgeAttendancePct.className = 'tab-badge';
+        } else {
+            elements.badgeAttendancePct.className = 'tab-badge danger';
+        }
     }
 
-    elements.attAttendedCount.textContent = `${report.total_attended} / ${report.total_sessions}`;
-    elements.attMissedCount.textContent = report.total_absent;
-    elements.attCoursesCount.textContent = report.courses ? report.courses.length : 0;
+    if (elements.attOverallPct) {
+        elements.attOverallPct.textContent = `${pct.toFixed(1)}%`;
+        if (pct >= 85.0) {
+            elements.attOverallPct.className = 'stat-card-val text-success';
+            if (elements.attOverallStatus) elements.attOverallStatus.textContent = 'EXCELLENT (Above 85% Target)';
+        } else if (pct >= 80.0) {
+            elements.attOverallPct.className = 'stat-card-val text-warning';
+            if (elements.attOverallStatus) elements.attOverallStatus.textContent = 'SAFE (Above 80% Requirement)';
+        } else {
+            elements.attOverallPct.className = 'stat-card-val text-danger';
+            if (elements.attOverallStatus) elements.attOverallStatus.textContent = 'SHORTAGE (Below 80% Requirement)';
+        }
+    }
+
+    if (elements.attAttendedCount) elements.attAttendedCount.textContent = `${report.total_attended} / ${report.total_sessions}`;
+    if (elements.attMissedCount) elements.attMissedCount.textContent = report.total_absent;
+    if (elements.attCoursesCount) elements.attCoursesCount.textContent = report.courses ? report.courses.length : 0;
 
     renderAttendanceCourses();
     renderAttendanceSessions();
