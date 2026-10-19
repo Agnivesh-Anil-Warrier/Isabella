@@ -2,16 +2,16 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Isabella • IIIT Kottayam LMS Material Downloader</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <title>Isabella • IIIT Kottayam Student Suite</title>
     <!-- Google Fonts -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&family=Plus+Jakarta+Sans:wght@400;500;600;700&family=JetBrains+Mono:wght@400;600;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="/static/css/style.css">
 </head>
 <body>
-    <!-- Background glow shapes -->
+    <!-- Background ambient glow shapes -->
     <div class="ambient-glow glow-1"></div>
     <div class="ambient-glow glow-2"></div>
 
@@ -28,8 +28,8 @@
                     </svg>
                 </div>
                 <div class="brand-text">
-                    <div class="brand-title">Isabella <span class="badge-tag">LMS Sync</span></div>
-                    <div class="brand-sub">IIIT Kottayam Course Materials Automator</div>
+                    <div class="brand-title">Isabella <span class="badge-tag">Suite</span></div>
+                    <div class="brand-sub">IIIT Kottayam LMS & Attendance Automator</div>
                 </div>
             </div>
 
@@ -40,19 +40,16 @@
                     <span class="year-badge" id="header-year">Year 3</span>
                 </div>
 
-                <button id="btn-open-folder" class="btn btn-secondary btn-icon" title="Open Downloads Folder">
+                <div class="lan-chip" id="lan-chip" title="Access from your phone on the same Wi-Fi">
+                    <span class="lan-dot"></span>
+                    <span id="lan-ip-text">📱 LAN: Loading...</span>
+                </div>
+
+                <button id="btn-open-folder" class="btn btn-secondary btn-icon desktop-only" title="Open Downloads Folder">
                     <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                         <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"></path>
                     </svg>
                     <span>Downloads</span>
-                </button>
-
-                <button id="btn-settings" class="btn btn-secondary btn-icon" title="Preferences & Account">
-                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                        <circle cx="12" cy="12" r="3"></circle>
-                        <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path>
-                    </svg>
-                    <span>Settings</span>
                 </button>
 
                 <button id="btn-logout" class="btn btn-ghost btn-icon hidden" title="Log Out">
@@ -65,76 +62,386 @@
             </div>
         </header>
 
+        <!-- Navigation Tabs (Touch Friendly & Responsive) -->
+        <nav class="main-nav-tabs" id="main-nav-tabs">
+            <button class="nav-tab-btn active" data-tab="tab-courses">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"></path>
+                    <path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"></path>
+                </svg>
+                <span>Courses & Downloads</span>
+            </button>
+            <button class="nav-tab-btn" data-tab="tab-feedback">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M9 11l3 3L22 4"></path>
+                    <path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"></path>
+                </svg>
+                <span>Course Feedback</span>
+                <span class="tab-badge" id="badge-feedback-count">0</span>
+            </button>
+            <button class="nav-tab-btn" data-tab="tab-attendance">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M16 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path>
+                    <circle cx="8.5" cy="7" r="4"></circle>
+                    <line x1="20" y1="8" x2="20" y2="14"></line>
+                    <line x1="23" y1="11" x2="17" y2="11"></line>
+                </svg>
+                <span>Attendance Portal</span>
+                <span class="tab-badge success" id="badge-attendance-pct">--%</span>
+            </button>
+            <button class="nav-tab-btn" data-tab="tab-settings">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <circle cx="12" cy="12" r="3"></circle>
+                    <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path>
+                </svg>
+                <span>Settings</span>
+            </button>
+        </nav>
+
         <!-- Main Workspace -->
         <main class="app-main">
-            <!-- Year of Study Filter Tabs -->
-            <section class="filter-section">
-                <div class="section-label">
-                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                        <polygon points="12 2 2 7 12 12 22 7 12 2"></polygon>
-                        <polyline points="2 17 12 22 22 17"></polyline>
-                        <polyline points="2 12 12 17 22 12"></polyline>
-                    </svg>
-                    <span>Year of Study</span>
-                </div>
-                <div class="year-pills" id="year-tabs">
-                    <button class="pill-tab" data-year="all">All Courses <span class="pill-count" id="count-all">0</span></button>
-                    <button class="pill-tab" data-year="1">Year 1 <span class="pill-count" id="count-1">0</span></button>
-                    <button class="pill-tab" data-year="2">Year 2 <span class="pill-count" id="count-2">0</span></button>
-                    <button class="pill-tab active" data-year="3">Year 3 <span class="pill-count" id="count-3">0</span></button>
-                    <button class="pill-tab" data-year="4">Year 4 <span class="pill-count" id="count-4">0</span></button>
-                    <button class="pill-tab" data-year="other">Other <span class="pill-count" id="count-other">0</span></button>
-                </div>
-            </section>
+            <!-- ============================================================= -->
+            <!-- TAB 1: Course Materials & Downloads                           -->
+            <!-- ============================================================= -->
+            <div id="view-courses" class="tab-view active">
+                <!-- Year of Study Filter Tabs -->
+                <section class="filter-section">
+                    <div class="section-label">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <polygon points="12 2 2 7 12 12 22 7 12 2"></polygon>
+                            <polyline points="2 17 12 22 22 17"></polyline>
+                            <polyline points="2 12 12 17 22 12"></polyline>
+                        </svg>
+                        <span>Year of Study</span>
+                    </div>
+                    <div class="year-pills" id="year-tabs">
+                        <button class="pill-tab" data-year="all">All Courses <span class="pill-count" id="count-all">0</span></button>
+                        <button class="pill-tab" data-year="1">Year 1 <span class="pill-count" id="count-1">0</span></button>
+                        <button class="pill-tab" data-year="2">Year 2 <span class="pill-count" id="count-2">0</span></button>
+                        <button class="pill-tab active" data-year="3">Year 3 <span class="pill-count" id="count-3">0</span></button>
+                        <button class="pill-tab" data-year="4">Year 4 <span class="pill-count" id="count-4">0</span></button>
+                        <button class="pill-tab" data-year="other">Other <span class="pill-count" id="count-other">0</span></button>
+                    </div>
+                </section>
 
-            <!-- Control Bar (Search, Select All, Download Action) -->
-            <section class="control-bar">
-                <div class="search-box">
-                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                        <circle cx="11" cy="11" r="8"></circle>
-                        <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
-                    </svg>
-                    <input type="text" id="course-search" placeholder="Search courses by name or code (e.g. CSS311)...">
-                </div>
-
-                <div class="action-group">
-                    <div class="selection-actions">
-                        <button id="btn-select-all" class="btn btn-ghost">Select All</button>
-                        <button id="btn-deselect-all" class="btn btn-ghost">Deselect</button>
+                <!-- Control Bar (Search, Select All, Download Action) -->
+                <section class="control-bar">
+                    <div class="search-box">
+                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <circle cx="11" cy="11" r="8"></circle>
+                            <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+                        </svg>
+                        <input type="text" id="course-search" placeholder="Search courses by name or code (e.g. CSS311)...">
                     </div>
 
-                    <label class="toggle-control" title="Download folder as a single ZIP archive and extract it">
-                        <input type="checkbox" id="chk-use-zip">
-                        <span class="toggle-slider"></span>
-                        <span class="toggle-label">Folder ZIP Mode</span>
-                    </label>
+                    <div class="action-group">
+                        <div class="selection-actions">
+                            <button id="btn-select-all" class="btn btn-ghost">Select All</button>
+                            <button id="btn-deselect-all" class="btn btn-ghost">Deselect</button>
+                        </div>
 
-                    <button id="btn-download-selected" class="btn btn-primary" disabled>
-                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
-                            <polyline points="7 10 12 15 17 10"></polyline>
-                            <line x1="12" y1="15" x2="12" y2="3"></line>
-                        </svg>
-                        <span id="download-btn-text">Download Selected (0)</span>
-                    </button>
+                        <label class="toggle-control" title="Download folder as a single ZIP archive and extract it">
+                            <input type="checkbox" id="chk-use-zip">
+                            <span class="toggle-slider"></span>
+                            <span class="toggle-label">Folder ZIP</span>
+                        </label>
+
+                        <button id="btn-download-selected" class="btn btn-primary" disabled>
+                            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                                <polyline points="7 10 12 15 17 10"></polyline>
+                                <line x1="12" y1="15" x2="12" y2="3"></line>
+                            </svg>
+                            <span id="download-btn-text">Download Selected (0)</span>
+                        </button>
+                    </div>
+                </section>
+
+                <!-- Loading Spinner State -->
+                <div id="courses-loading" class="empty-state">
+                    <div class="spinner"></div>
+                    <div class="empty-title">Loading courses from IIIT Kottayam LMS...</div>
+                    <div class="empty-sub">Connecting to moodle service and parsing modules</div>
                 </div>
-            </section>
 
-            <!-- Loading Spinner State -->
-            <div id="courses-loading" class="empty-state">
-                <div class="spinner"></div>
-                <div class="empty-title">Loading courses from IIIT Kottayam LMS...</div>
-                <div class="empty-sub">Connecting to moodle service and parsing modules</div>
+                <!-- Course Cards Grid -->
+                <section id="courses-grid" class="courses-grid hidden"></section>
+
+                <!-- Empty Grid Notice -->
+                <div id="no-courses-state" class="empty-state hidden">
+                    <div class="empty-icon">🔍</div>
+                    <div class="empty-title">No courses found</div>
+                    <div class="empty-sub">No courses matched your year or search filter.</div>
+                </div>
             </div>
 
-            <!-- Course Cards Grid -->
-            <section id="courses-grid" class="courses-grid hidden"></section>
+            <!-- ============================================================= -->
+            <!-- TAB 2: Course Feedback Forms                                  -->
+            <!-- ============================================================= -->
+            <div id="view-feedback" class="tab-view hidden">
+                <section class="filter-section">
+                    <div class="section-label">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <polygon points="12 2 2 7 12 12 22 7 12 2"></polygon>
+                            <polyline points="2 17 12 22 22 17"></polyline>
+                            <polyline points="2 12 12 17 22 12"></polyline>
+                        </svg>
+                        <span>Filter by Year</span>
+                    </div>
+                    <div class="year-pills" id="feedback-year-tabs">
+                        <button class="pill-tab" data-fbyear="all">All Forms</button>
+                        <button class="pill-tab" data-fbyear="1">Year 1</button>
+                        <button class="pill-tab" data-fbyear="2">Year 2</button>
+                        <button class="pill-tab active" data-fbyear="3">Year 3</button>
+                        <button class="pill-tab" data-fbyear="4">Year 4</button>
+                    </div>
+                </section>
 
-            <!-- Empty Grid Notice -->
-            <div id="no-courses-state" class="empty-state hidden">
-                <div class="empty-icon">🔍</div>
-                <div class="empty-title">No courses found</div>
-                <div class="empty-sub">No courses matched your year or search filter.</div>
+                <!-- Control Bar -->
+                <section class="control-bar">
+                    <div class="search-box">
+                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <circle cx="11" cy="11" r="8"></circle>
+                            <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+                        </svg>
+                        <input type="text" id="feedback-search" placeholder="Search feedback forms or course names...">
+                    </div>
+
+                    <div class="action-group">
+                        <button id="btn-scan-feedback" class="btn btn-secondary">
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <polyline points="23 4 23 10 17 10"></polyline>
+                                <polyline points="1 20 1 14 7 14"></polyline>
+                                <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"></path>
+                            </svg>
+                            <span>Scan LMS Forms</span>
+                        </button>
+                        <button id="btn-autofill-all-feedback" class="btn btn-primary">
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"></polygon>
+                            </svg>
+                            <span>Auto-Fill All Pending</span>
+                        </button>
+                    </div>
+                </section>
+
+                <!-- AI Engine Notice -->
+                <div class="ai-banner" id="ai-banner">
+                    <div class="ai-banner-icon">⚡</div>
+                    <div class="ai-banner-text">
+                        <strong>Feedback Engine:</strong> <span id="feedback-engine-name">Smart Positive Heuristic</span>
+                        <span class="ai-banner-sub">• Automatically selects top ratings (5/5) and fills authentic constructive responses.</span>
+                    </div>
+                </div>
+
+                <!-- Feedback List / Grid -->
+                <div id="feedback-loading" class="empty-state hidden">
+                    <div class="spinner"></div>
+                    <div class="empty-title">Scanning feedback forms...</div>
+                </div>
+
+                <div id="feedback-grid" class="feedback-grid"></div>
+
+                <div id="no-feedback-state" class="empty-state hidden">
+                    <div class="empty-icon">📋</div>
+                    <div class="empty-title">No feedback forms found</div>
+                    <div class="empty-sub">Click [ Scan LMS Forms ] or choose another year filter.</div>
+                </div>
+            </div>
+
+            <!-- ============================================================= -->
+            <!-- TAB 3: Attendance Portal (FACTS-H)                             -->
+            <!-- ============================================================= -->
+            <div id="view-attendance" class="tab-view hidden">
+                <!-- Student Recon Banner -->
+                <div class="attendance-banner" id="att-student-banner">
+                    <div class="att-banner-left">
+                        <div class="att-student-title">
+                            <span class="att-live-dot"></span>
+                            <span id="att-student-roll">2024BCS0256</span> • <span id="att-student-name">STUDENT</span>
+                        </div>
+                        <div class="att-student-sub" id="att-student-sem">CSE · Semester 5 • IIIT Kottayam</div>
+                    </div>
+                    <div class="att-banner-right">
+                        <button id="btn-sync-attendance" class="btn btn-primary btn-sm">
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <polyline points="23 4 23 10 17 10"></polyline>
+                                <polyline points="1 20 1 14 7 14"></polyline>
+                                <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"></path>
+                            </svg>
+                            <span>Sync Live</span>
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Metric Stat Cards -->
+                <div class="stat-grid">
+                    <div class="stat-card">
+                        <div class="stat-card-label">OVERALL ATTENDANCE</div>
+                        <div class="stat-card-val text-success" id="att-overall-pct">--%</div>
+                        <div class="stat-card-sub" id="att-overall-status">Loading attendance...</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-card-label">ATTENDED SESSIONS</div>
+                        <div class="stat-card-val" id="att-attended-count">-- / --</div>
+                        <div class="stat-card-sub">Completed classroom sessions</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-card-label">MISSED SESSIONS</div>
+                        <div class="stat-card-val text-danger" id="att-missed-count">--</div>
+                        <div class="stat-card-sub">Recorded absences</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-card-label">ENROLLED COURSES</div>
+                        <div class="stat-card-val" id="att-courses-count">--</div>
+                        <div class="stat-card-sub">Active evaluated subjects</div>
+                    </div>
+                </div>
+
+                <!-- Sub-nav for Attendance: By Course vs Recent Sessions -->
+                <div class="att-view-switch">
+                    <button class="att-switch-btn active" data-attview="course">By Course Breakdown</button>
+                    <button class="att-switch-btn" data-attview="sessions">Recent Sessions Audit Log</button>
+                </div>
+
+                <!-- By Course View -->
+                <div id="att-view-course" class="att-subview active">
+                    <div class="search-box mb-3">
+                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <circle cx="11" cy="11" r="8"></circle>
+                            <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+                        </svg>
+                        <input type="text" id="att-course-search" placeholder="Filter attendance courses by code or title...">
+                    </div>
+                    <div id="att-courses-table-container" class="table-container">
+                        <table class="modern-table">
+                            <thead>
+                                <tr>
+                                    <th>CODE</th>
+                                    <th>COURSE NAME</th>
+                                    <th>ATTENDED</th>
+                                    <th>PROGRESS</th>
+                                    <th>%</th>
+                                    <th>STATUS</th>
+                                    <th>SAFE BUFFER</th>
+                                </tr>
+                            </thead>
+                            <tbody id="att-courses-tbody"></tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <!-- Recent Sessions View -->
+                <div id="att-view-sessions" class="att-subview hidden">
+                    <div class="control-bar mb-3">
+                        <div class="year-pills" id="att-status-pills">
+                            <button class="pill-tab active" data-attstat="all">All Sessions</button>
+                            <button class="pill-tab" data-attstat="present">Present Only</button>
+                            <button class="pill-tab" data-attstat="absent">Absent Only</button>
+                        </div>
+                    </div>
+                    <div id="att-sessions-table-container" class="table-container">
+                        <table class="modern-table">
+                            <thead>
+                                <tr>
+                                    <th>CODE</th>
+                                    <th>COURSE</th>
+                                    <th>DATE, TIME & VENUE</th>
+                                    <th>STATUS</th>
+                                </tr>
+                            </thead>
+                            <tbody id="att-sessions-tbody"></tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+            <!-- ============================================================= -->
+            <!-- TAB 4: Settings & Configuration                               -->
+            <!-- ============================================================= -->
+            <div id="view-settings" class="tab-view hidden">
+                <div class="settings-container">
+                    <!-- Mobile Connect Card -->
+                    <div class="settings-card highlight-card">
+                        <div class="settings-card-header">
+                            <div class="card-title">📱 Mobile / Phone Access</div>
+                            <div class="card-subtitle">Connect your Android phone directly over Wi-Fi</div>
+                        </div>
+                        <div class="lan-box">
+                            <div class="lan-url-box">
+                                <span class="lan-label">Open in Mobile Chrome:</span>
+                                <code id="lan-url-display">http://localhost:5000</code>
+                            </div>
+                            <p class="lan-help">Make sure your phone and laptop are connected to the same Wi-Fi / hostel network or mobile hotspot. Add to home screen for native app experience!</p>
+                        </div>
+                    </div>
+
+                    <!-- LMS Account Card -->
+                    <form id="form-full-settings" class="settings-card">
+                        <div class="settings-card-header">
+                            <div class="card-title">🔐 IIITK Moodle LMS Credentials</div>
+                            <div class="card-subtitle">Used to synchronize courses, materials, and feedback forms</div>
+                        </div>
+
+                        <div id="settings-alert" class="alert-box alert-success hidden"></div>
+
+                        <div class="form-grid">
+                            <div class="form-group">
+                                <label for="set-lms-username">LMS Roll Number / Username</label>
+                                <input type="text" id="set-lms-username" placeholder="e.g. 2024BCS0256" required>
+                            </div>
+                            <div class="form-group">
+                                <label for="set-lms-password">LMS Password</label>
+                                <input type="password" id="set-lms-password" placeholder="Leave blank to keep current">
+                            </div>
+                            <div class="form-group">
+                                <label for="set-default-year">Default Year of Study</label>
+                                <select id="set-default-year">
+                                    <option value="1">Year 1 (Freshmen)</option>
+                                    <option value="2">Year 2 (Sophomores)</option>
+                                    <option value="3" selected>Year 3 (Juniors)</option>
+                                    <option value="4">Year 4 (Seniors)</option>
+                                </select>
+                            </div>
+                        </div>
+
+                        <div class="settings-divider"></div>
+
+                        <div class="settings-card-header">
+                            <div class="card-title">⚡ Gemini AI Feedback Engine</div>
+                            <div class="card-subtitle">Auto-generates authentic positive responses (model: <code>gemini-3.5-flash-lite</code>)</div>
+                        </div>
+
+                        <div class="form-group">
+                            <label for="set-gemini-key">Gemini API Key (Optional)</label>
+                            <input type="password" id="set-gemini-key" placeholder="AIzaSy... (Leave empty for Smart 0-token Heuristic)">
+                        </div>
+
+                        <div class="settings-divider"></div>
+
+                        <div class="settings-card-header">
+                            <div class="card-title">📊 FACTS-H Attendance Portal Credentials</div>
+                            <div class="card-subtitle">Authenticates with <code>attendance.iiitkottayam.ac.in</code></div>
+                        </div>
+
+                        <div class="form-grid">
+                            <div class="form-group">
+                                <label for="set-att-email">Student Portal Email</label>
+                                <input type="email" id="set-att-email" placeholder="student24bcs000@iiitkottayam.ac.in">
+                            </div>
+                            <div class="form-group">
+                                <label for="set-att-password">Portal Password</label>
+                                <input type="password" id="set-att-password" placeholder="Leave blank to keep unchanged">
+                            </div>
+                        </div>
+
+                        <div class="settings-actions">
+                            <button type="submit" class="btn btn-primary" id="btn-save-full-settings">
+                                <span>Save All Settings</span>
+                            </button>
+                        </div>
+                    </form>
+                </div>
             </div>
         </main>
     </div>
@@ -151,7 +458,6 @@
             </div>
 
             <div class="modal-body">
-                <!-- Overall Progress Bar -->
                 <div class="progress-container">
                     <div class="progress-bar-bg">
                         <div id="dl-progress-bar" class="progress-bar-fill" style="width: 0%;"></div>
@@ -162,13 +468,11 @@
                     </div>
                 </div>
 
-                <!-- Current Action Highlight -->
                 <div class="current-action-box">
                     <div class="current-action-label">Currently Processing:</div>
                     <div class="current-action-title" id="dl-current-file">Initializing...</div>
                 </div>
 
-                <!-- Live Stream Event Log -->
                 <div class="log-console-container">
                     <div class="log-console-header">Live Download Log</div>
                     <div class="log-console" id="dl-log-console">
@@ -176,7 +480,6 @@
                     </div>
                 </div>
 
-                <!-- Final Summary (Hidden during download) -->
                 <div id="dl-summary-box" class="summary-box hidden">
                     <div class="summary-stat">
                         <div class="stat-num text-success" id="stat-downloaded">0</div>
@@ -194,137 +497,13 @@
             </div>
 
             <div class="modal-footer">
-                <button id="btn-open-dir-done" class="btn btn-secondary hidden">
-                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                        <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"></path>
-                    </svg>
-                    Open Folder
-                </button>
+                <button id="btn-open-dir-done" class="btn btn-secondary hidden desktop-only">Open Folder</button>
                 <button id="btn-dismiss-download" class="btn btn-primary hidden">Done</button>
             </div>
         </div>
     </div>
 
-    <!-- Login / Credentials Modal -->
-    <div id="login-modal" class="modal-backdrop hidden">
-        <div class="modal-card">
-            <div class="modal-header">
-                <div class="modal-title-group">
-                    <div class="modal-title">🔐 IIIT Kottayam LMS Login</div>
-                    <div class="modal-subtitle">Log in to fetch course materials automatically</div>
-                </div>
-            </div>
-
-            <form id="form-login" class="modal-body form-grid">
-                <div id="login-error-alert" class="alert-box alert-error hidden"></div>
-
-                <div class="form-group">
-                    <label for="login-username">LMS Username / Roll Number</label>
-                    <div class="input-wrapper">
-                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                            <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path>
-                            <circle cx="12" cy="7" r="4"></circle>
-                        </svg>
-                        <input type="text" id="login-username" placeholder="e.g. 2024BCS0256" required autocomplete="username">
-                    </div>
-                </div>
-
-                <div class="form-group">
-                    <label for="login-password">LMS Password</label>
-                    <div class="input-wrapper">
-                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                            <rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect>
-                            <path d="M7 11V7a5 5 0 0 1 10 0v4"></path>
-                        </svg>
-                        <input type="password" id="login-password" placeholder="••••••••••••" required autocomplete="current-password">
-                    </div>
-                </div>
-
-                <div class="form-group">
-                    <label for="login-year">Current Year of Study</label>
-                    <div class="input-wrapper">
-                        <select id="login-year">
-                            <option value="1">1st Year (Semester 1 & 2)</option>
-                            <option value="2">2nd Year (Semester 3 & 4)</option>
-                            <option value="3" selected>3rd Year (Semester 5 & 6)</option>
-                            <option value="4">4th Year (Semester 7 & 8)</option>
-                        </select>
-                    </div>
-                </div>
-
-                <div class="form-options">
-                    <label class="checkbox-control">
-                        <input type="checkbox" id="login-remember" checked>
-                        <span>Remember details on this PC</span>
-                    </label>
-                </div>
-
-                <div class="modal-footer">
-                    <button type="submit" id="btn-submit-login" class="btn btn-primary btn-block">
-                        <span class="btn-text">Log In & Fetch Courses</span>
-                        <div class="spinner btn-spinner hidden"></div>
-                    </button>
-                </div>
-            </form>
-        </div>
-    </div>
-
-    <!-- Settings & Profile Update Modal -->
-    <div id="settings-modal" class="modal-backdrop hidden">
-        <div class="modal-card">
-            <div class="modal-header">
-                <div class="modal-title-group">
-                    <div class="modal-title">⚙️ Preferences & Credentials</div>
-                    <div class="modal-subtitle">Update remembered details and default year of study</div>
-                </div>
-                <button id="btn-close-settings" class="btn-close">&times;</button>
-            </div>
-
-            <form id="form-settings" class="modal-body form-grid">
-                <div id="settings-success-alert" class="alert-box alert-success hidden"></div>
-
-                <div class="form-group">
-                    <label for="settings-username">Saved Username / Roll No</label>
-                    <div class="input-wrapper">
-                        <input type="text" id="settings-username" required>
-                    </div>
-                </div>
-
-                <div class="form-group">
-                    <label for="settings-password">Update Password (leave blank to keep current)</label>
-                    <div class="input-wrapper">
-                        <input type="password" id="settings-password" placeholder="Leave blank to keep unchanged">
-                    </div>
-                </div>
-
-                <div class="form-group">
-                    <label for="settings-year">Default Year of Study</label>
-                    <div class="input-wrapper">
-                        <select id="settings-year">
-                            <option value="1">1st Year</option>
-                            <option value="2">2nd Year</option>
-                            <option value="3">3rd Year</option>
-                            <option value="4">4th Year</option>
-                        </select>
-                    </div>
-                </div>
-
-                <div class="form-options">
-                    <label class="checkbox-control">
-                        <input type="checkbox" id="settings-remember" checked>
-                        <span>Keep credentials saved locally</span>
-                    </label>
-                </div>
-
-                <div class="modal-footer">
-                    <button type="button" id="btn-forget-credentials" class="btn btn-danger-ghost">Forget Credentials</button>
-                    <button type="submit" class="btn btn-primary">Save Changes</button>
-                </div>
-            </form>
-        </div>
-    </div>
-
-    <!-- Course Section Preview Drawer / Modal -->
+    <!-- Course Section Preview Modal -->
     <div id="preview-modal" class="modal-backdrop hidden">
         <div class="modal-card preview-card">
             <div class="modal-header">

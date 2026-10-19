@@ -2118,6 +2118,10 @@ class LMSMainWindow(QMainWindow):
                 attendance_access_token="",
                 attendance_refresh_token=""
             )
+            if hasattr(self, 'input_setting_att_email'):
+                self.input_setting_att_email.setText(dlg.email)
+            if hasattr(self, 'input_setting_att_password'):
+                self.input_setting_att_password.setText(dlg.password)
             self.live_sync_attendance()
 
     def live_sync_attendance(self):
@@ -2542,6 +2546,8 @@ class LMSMainWindow(QMainWindow):
         self.gemini_api_key = gemini_key
 
         save_config(username, password, default_year, remember, gemini_api_key=gemini_key)
+        self.set_year_filter(default_year)
+        self.set_feedback_year_filter(default_year)
         self.update_ai_mode_badge()
         QMessageBox.information(self, "SYSTEM_UPDATE", "> LMS CREDENTIALS, DEFAULT YEAR, AND AI CONFIG SAVED.")
 
